@@ -12,25 +12,38 @@ public class Main {
     public static ArrayList<Integer> dataAddresses = new ArrayList<>();
     public static Map<Integer, Integer> data = new HashMap<>();
     public static Map<Integer, Instruction> instructions = new HashMap<>();
+    //public static Map<Integer, Instruction> instructions = new HashMap<>();
     public static  int cycle = 1;
+    //CREATE ARRAYS WITH THE ASSEMBLY CODE
+    public static String [] assemblyCode = new String[50];
 
     public static void main(String[] args) {
         // ARGS: -i, "filename.bin", -o, "out_name"
-        String inputFile = "t2.bin";
-        String outputFilePrefix = "t2.pipeline";
+        String inputFile = "t1.bin";
+        String outputFilePrefix = "t1.pipeline";
         //Replace with after testing
 //        String inputFile = args[1];
 //        String outputFilePrefix = args[3];
 
-        //CREATE ARRAYS WITH THE ASSEMBLY CODE
-        String [] assemblyCode = new String[50];
+//        //CREATE ARRAYS WITH THE ASSEMBLY CODE
+//        public static String [] assemblyCode = new String[50];
         int assemblyCodeCount = 0;
-        // CREATE ARRAYS WITH THE VALUES IN EACH OF THE STAGES
+        //Create arrays with the values in each of the stages
         int [] PreIssueBuffer = new int[4];
         int [] PreALUQueue = new int[2];
         int [] PostALUQueue = new int[1];
         int [] PreMEMQueue = new int[2];
         int [] PostMEMQueue = new int[1];
+
+        //will use the different arrays create above to see if they are null or not
+        // if they are then the next instruction will be fetched.
+        boolean isPreIssueBufferFull = false;
+        boolean isPreALUQueueFull = false;
+        boolean isPostALUQueueFull = false;
+        boolean isPreMEMQueueFull = false;
+        boolean isPostMEMQueueFull = false;
+
+
         byte[] bytes = readBinaryFile(inputFile);
         int memoryAddress = 96;
 
@@ -62,98 +75,112 @@ public class Main {
                 if (inst.valid == 0) {
                     printAndWrite(disFileWriter, " Invalid Instruction");
                     assemblyCode[arrayVal] =" Invalid Instruction";
-                    assemblyCodeCount++;
+                    //assemblyCodeCount++;
                     arrayVal++;
-                    //cycle++;
+                    cycle++;
                     isInvalid = true;
                 }
                 // nop will look like this: 10000000 00000000 00000000 00000000 which equals the min integer value
                 else if (inst.asInt == Integer.MIN_VALUE){
                     printAndWrite(disFileWriter, " NOP");
                     assemblyCode[arrayVal] =" NOP";
-                    assemblyCodeCount++;
+                    //assemblyCodeCount++;
                     inst.opcodeType = Opcode.NOP;
+                    arrayVal++;
                 }
                 else if (inst.opcode == 40) {
                     printAndWrite(disFileWriter, String.format(" ADDI\t R%s, R%s, #%s", inst.rt, inst.rs, inst.immd));
                     assemblyCode[arrayVal] = String.format(" ADDI\t R%s, R%s, #%s", inst.rt, inst.rs, inst.immd);
-                    assemblyCodeCount++;
+                    //assemblyCodeCount++;
                     inst.opcodeType = Opcode.ADDI;
+                    arrayVal++;
                 }
                 else if (inst.opcode == 43) {
                     printAndWrite(disFileWriter, String.format(" SW  \t R%s, %s(R%s)", inst.rt, inst.immd, inst.rs));
                     assemblyCode[arrayVal] = String.format(" SW  \t R%s, %s(R%s)", inst.rt, inst.immd, inst.rs);
-                    assemblyCodeCount++;
+//                    assemblyCodeCount++;
                     inst.opcodeType = Opcode.SW;
+                    arrayVal++;
                 }
                 else if (inst.opcode == 32 && inst.func == 0) {
                     // SLL Command
                     printAndWrite(disFileWriter, String.format(" SLL\t R%s, R%s, #%s", inst.rd, inst.rt, inst.sa));
                     assemblyCode[arrayVal] = String.format(" SLL\t R%s, R%s, #%s", inst.rd, inst.rt, inst.sa);
-                    assemblyCodeCount++;
+//                    assemblyCodeCount++;
+                    arrayVal++;
                     inst.opcodeType = Opcode.SLL;
                     //SLL	R10, R1, #2
                 }
                 else if (inst.opcode == 32 && inst.func == 2){
                     printAndWrite(disFileWriter, String.format(" SRL\t R%s, R%s, #%s", inst.rd, inst.rt, inst.sa));
                     assemblyCode[arrayVal] = String.format(" SRL\t R%s, R%s, #%s", inst.rd, inst.rt, inst.sa);
-                    assemblyCodeCount++;
+//                    assemblyCodeCount++;
+                    arrayVal++;
                     inst.opcodeType = Opcode.SRL;
                 }
                 else if (inst.opcode == 32 && inst.func == 34){
                     printAndWrite(disFileWriter, String.format(" SUB \t R%s, R%s, R%s", inst.rd, inst.rs, inst.rt));
                     assemblyCode[arrayVal] = String.format(" SUB \t R%s, R%s, R%s", inst.rd, inst.rs, inst.rt);
-                    assemblyCodeCount++;
+//                    assemblyCodeCount++;
+                    arrayVal++;
                     inst.opcodeType = Opcode.SUB;
                 }
                 else if (inst.opcode == 32 && inst.func == 32){
                     printAndWrite(disFileWriter, String.format(" ADD \t R%s, R%s, R%s", inst.rd, inst.rs, inst.rt));
                     assemblyCode[arrayVal] = String.format(" ADD \t R%s, R%s, R%s", inst.rd, inst.rs, inst.rt);
-                    assemblyCodeCount++;
+//                    assemblyCodeCount++;
+                    arrayVal++;
                     inst.opcodeType = Opcode.ADD;
                 }
                 else if (inst.opcode == 35) {
                     printAndWrite(disFileWriter, String.format(" LW  \t R%s, %s(R%s)", inst.rt, inst.immd, inst.rs));
                     assemblyCode[arrayVal] = String.format(" LW  \t R%s, %s(R%s)", inst.rt, inst.immd, inst.rs);
-                    assemblyCodeCount++;
+//                    assemblyCodeCount++;
+                    arrayVal++;
                     inst.opcodeType = Opcode.LW;
                 }
                 else if (inst.opcode == 34) {
                     printAndWrite(disFileWriter, String.format(" J  \t #%s", inst.j));
                     assemblyCode[arrayVal] = String.format(" J  \t #%s", inst.j);
-                    assemblyCodeCount++;
+//                    assemblyCodeCount++;
+                    arrayVal++;
                     inst.opcodeType = Opcode.J;
                 }
                 else if (inst.opcode == 33) {
                     inst.immd = inst.immd << 2;
                     printAndWrite(disFileWriter, String.format(" BLTZ\t R%s, #%s", inst.rs, inst.immd));
                     assemblyCode[arrayVal] = String.format(" BLTZ\t R%s, #%s", inst.rs, inst.immd);
-                    assemblyCodeCount++;
+//                    assemblyCodeCount++;
+                    arrayVal++;
                     inst.opcodeType = Opcode.BLTZ;
                 }
                 else if (inst.opcode == 32 && inst.func == 8){
                     printAndWrite(disFileWriter, String.format(" JR  \t R%s", inst.rs));
                     assemblyCode[arrayVal] = String.format(" JR  \t R%s", inst.rs);
-                    assemblyCodeCount++;
+//                    assemblyCodeCount++;
+                    arrayVal++;
                     inst.opcodeType = Opcode.JR;
                 }
                 else if (inst.opcode == 32 && inst.func == 13){
                     printAndWrite(disFileWriter," BREAK");
                     assemblyCode[arrayVal] = " BREAK";
                     inst.opcodeType = Opcode.BREAK;
-                    assemblyCodeCount++;
+//                    assemblyCodeCount++;
+                    arrayVal++;
                     reachedBreak = true;
                 }
                 else if (inst.opcode == 60){
                     printAndWrite(disFileWriter, String.format(" MUL \t R%s, R%s, R%s", inst.rd, inst.rs, inst.rt));
                     assemblyCode[arrayVal] = String.format(" MUL \t R%s, R%s, R%s", inst.rd, inst.rs, inst.rt);
-                    assemblyCodeCount++;
+//                    assemblyCodeCount++;
+                    arrayVal++;
                     inst.opcodeType = Opcode.MUL;
                 }
                 else if (inst.opcode == 32 && inst.func == 10){
                     printAndWrite(disFileWriter, String.format(" MOVZ\t R%s, R%S, R%s", inst.rd, inst.rs, inst.rt));
                     assemblyCode[arrayVal] = String.format(" MOVZ\t R%s, R%S, R%s", inst.rd, inst.rs, inst.rt);
-                    assemblyCodeCount++;
+//                    assemblyCodeCount++;
+                    arrayVal++;
                     inst.opcodeType = Opcode.MOVZ;
                 }
 
@@ -171,8 +198,6 @@ public class Main {
 
             memoryAddress += 4;
         }
-//
-//        System.out.println("--------------------");
 
         FileWriter simFileWriter = getFileWriter(outputFilePrefix + "_sim.txt");
 
@@ -199,7 +224,11 @@ public class Main {
                 simMemoryAddress += 4;
                 continue;
             }
-             String [] instructionArray = new String[50];
+//            for (int valueTemp = 0; valueTemp <= arrayVal; valueTemp++) {
+//                printAndWrite(simFileWriter, assemblyCode[valueTemp]);
+//            }
+            String [] instructionArray = new String[50];
+            arrayVal = 0;
             switch (inst.opcodeType) {
                 case ADD -> {
                     //printAndWrite(simFileWriter, String.format(" ADD \t R%s, R%s, R%s", inst.rd, inst.rs, inst.rt));
@@ -282,7 +311,7 @@ public class Main {
                     endLoop = true;
                 }
             }
-            printAndWrite(simFileWriter, "--------------------\n");
+            printAndWrite(simFileWriter, "\n--------------------\n");
             printAndWrite(simFileWriter, String.format("cycle: %s", cycle));
             printAndWrite(simFileWriter, "\nPre-Issue Buffer: ");
 
@@ -311,14 +340,9 @@ public class Main {
             printAndWrite(simFileWriter, createRegisterString());
             printAndWrite(simFileWriter, "\nData:");
             printAndWrite(simFileWriter, createDataString());
-            printAndWrite(simFileWriter, "\nPRINT OUT THE ARRAY COUNT "+ arrayVal); //DELETE //CHECKED AND WORKS USE THIS FOR THE
-            //CYCLE CALCULATION
-            for (int value = 0; value <= arrayVal; value++) {
-                printAndWrite(simFileWriter, "\nPRINT OUT THE ARRAY VALUES______ "+ instructionArray[value]); //DELETE
-
-            }
             cycle++;
             i++;
+
 
             // we don't want to add 4 to the jump address and mess stuff up
             if (!isJumping){
