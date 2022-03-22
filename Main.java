@@ -23,6 +23,9 @@ public class Main {
 //    public static Map<String, String> preMEMQueue = new HashMap<>();
 //    public static Map<String, String> postMEMQueue = new HashMap<>();
 
+    //check to see if it is a break instruction
+    public static boolean seenBreak = false;
+
     //will use the different arrays create above to see if they are null or not
     // if they are then the next instruction will be fetched.
     public static boolean isPreIssueBufferFull = false;
@@ -39,8 +42,8 @@ public class Main {
     //Create arrays with the values in each of the stages
     public static String [] preIssueBuffer = new String[4];
     public static String [] preALUQueue = new String[2];
-    public static String [] postALUQueue = new String[1];
     public static String [] preMEMQueue = new String[2];
+    public static String [] postALUQueue = new String[1];
     public static String [] postMEMQueue = new String[1];
 
     //the current value for the arrayWithInstructions
@@ -126,6 +129,7 @@ public class Main {
                 else if (inst.opcode == 33) {
                     inst.immd = inst.immd << 2;
                     printAndWrite(disFileWriter, String.format(" BLTZ\t R%s, #%s", inst.rs, inst.immd));
+                    seenBreak = true;
                     inst.opcodeType = Opcode.BLTZ;
                 }
                 else if (inst.opcode == 32 && inst.func == 8){
@@ -134,6 +138,7 @@ public class Main {
                 }
                 else if (inst.opcode == 32 && inst.func == 13){
                     printAndWrite(disFileWriter," BREAK");
+//                    seenBreak = true;
                     inst.opcodeType = Opcode.BREAK;
                     reachedBreak = true;
                 }
@@ -580,6 +585,42 @@ public class Main {
         return temp;
     }
 }
+//public class WB {
+//    public WB() {
+//        WB data = new WB(); //fix for initial constructor
+//    }
+//    public static void main(String [] args) {
+//        WB data = new WB();
+//        if (postALUQueue != None) {
+//            //R[postALUQueue[0][0] = postALUQueue[0][1]
+//            //postALUQueue[0] = none
+//        }
+//        if (postMemQueue != None) {
+//            //R[postMemQueue[0][0] = postMemQueue[0][1]
+//            //postMemQueue[0] = none
+//        }
+//    }
+//    //in main wb.run();
+//}
+//public class class Fetch {
+//    public Fetch() {
+//        Fetch data = new Fetch();
+//        seenBreak = false;
+//    }
+// loop through twice
+//    public static void main(String [] args) {
+//        if(preIssueBuffer != None) {
+//            return;
+//        }
+//        if(seenBreak) {
+//            return;
+//        }
+//    }
+//        public static checkRBW(rs reg) {
+//          checks for the hazard
+//        }
+//
+//}
 
 
 
