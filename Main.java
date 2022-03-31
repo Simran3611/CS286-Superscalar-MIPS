@@ -1,9 +1,7 @@
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class Main {
 
@@ -13,6 +11,12 @@ public class Main {
     public static ArrayList<Integer> dataAddresses = new ArrayList<>();
     public static Map<Integer, Integer> data = new HashMap<>();
     public static Map<Integer, Instruction> instructions = new HashMap<>();
+    public static Queue<Instruction> preIssueBuffer = new PriorityQueue<Instruction>();
+    public static Queue<Instruction> preALU = new PriorityQueue<Instruction>();
+    public static Queue<Instruction> preMem = new PriorityQueue<Instruction>();
+    public static Queue<Instruction> postMem = new PriorityQueue<Instruction>();
+    public static Queue<Instruction> postALU = new PriorityQueue<Instruction>();
+
 
     public static void main(String[] args) {
         // ARGS: -i, "filename.bin", -o, "out_name"
@@ -129,10 +133,6 @@ public class Main {
 
             memoryAddress += 4;
         }
-
-        System.out.println("======================");
-        System.out.println("      Simulation      ");
-        System.out.println("======================");
 
         FileWriter simFileWriter = getFileWriter(outputFilePrefix + "_sim.txt");
 
@@ -381,6 +381,64 @@ public class Main {
         }
 
         return temp;
+    }
+    public static void InstructionFetch() {
+
+    }
+    public static void Issue() {
+
+    }
+    public static void Mem() {
+        if(preMem.peek() != null) {
+            Instruction preMemValue = preMem.poll();
+            switch (preMemValue.opcodeType) {
+                case SW:
+                    break;
+                case LW:
+                    postMem.add(preMemValue);
+                    break;
+            }
+        }
+    }
+    public static void ALU() {
+        if(preALU.peek() != null) {
+            Instruction preALUValue = preALU.poll();
+            postALU.add(preALUValue);
+        }
+    }
+    public static void WB() {
+        if(postALU.peek() != null) {
+            Instruction postALUValue = postALU.poll();
+            switch (postALUValue.opcodeType) {
+                //fix the changing of the register values as they probably will be changed in the issue stage.
+                case ADD:
+                    registers[postALUValue.rd] = registers[postALUValue.rs] + registers[postALUValue.rt];
+                    break;
+                case SUB:
+                    registers[postALUValue.rd] = registers[postALUValue.rs] - registers[postALUValue.rt];
+                    break;
+                case ADDI:
+                    registers[postALUValue.rt] = registers[postALUValue.rs] + postALUValue.immd;
+                    break;
+                case SLL:
+                    registers[postALUValue.rd] = registers[postALUValue.rt] << postALUValue.sa;
+                    break;
+                case SRL:
+                    registers[postALUValue.rd] = registers[postALUValue.rt] >> postALUValue.sa;
+                    break;
+                case MUL:
+                    registers[postALUValue.rd] = registers[postALUValue.rs] * registers[postALUValue.rt];
+                    break;
+                case MOVZ:
+                    if (registers[postALUValue.rt] == 0) {
+                        registers[postALUValue.rd] = registers[postALUValue.rs];
+                    }
+                    break;
+            }
+        }
+        if(postMem.peek() != null) {
+            Instruction postMemValue = postMem.poll();
+        }
     }
 }
 
