@@ -1,41 +1,55 @@
- LW  	 R1, 128(R0)cycle: 1
-Registers
+====================
+cycle: 1 96	 LW  	 R1, 128(R0)
+
+registers:
 r00:	0	4	0	0	0	0	0	0	
 r08:	0	0	0	0	0	0	0	0	
 r16:	0	0	0	0	0	0	0	0	
 r24:	0	0	0	0	0	0	0	0	
 
-Data:
-128:	4	16	 ADDI	 R1, R1, #-8cycle: 2
-Registers
+data:
+128:	4	16	
+====================
+cycle: 2 100	 ADDI	 R1, R1, #-8
+
+registers:
 r00:	0	-4	0	0	0	0	0	0	
 r08:	0	0	0	0	0	0	0	0	
 r16:	0	0	0	0	0	0	0	0	
 r24:	0	0	0	0	0	0	0	0	
 
-Data:
-128:	4	16	 SW  	 R1, 128(R0)cycle: 3
-Registers
+data:
+128:	4	16	
+====================
+cycle: 3 104	 SW  	 R1, 128(R0)
+
+registers:
 r00:	0	-4	0	0	0	0	0	0	
 r08:	0	0	0	0	0	0	0	0	
 r16:	0	0	0	0	0	0	0	0	
 r24:	0	0	0	0	0	0	0	0	
 
-Data:
-128:	-4	16	 BLTZ	 R1, #8cycle: 4
-Registers
+data:
+128:	-4	16	
+====================
+cycle: 4 108	 BLTZ	 R1, #8
+
+registers:
 r00:	0	-4	0	0	0	0	0	0	
 r08:	0	0	0	0	0	0	0	0	
 r16:	0	0	0	0	0	0	0	0	
 r24:	0	0	0	0	0	0	0	0	
 
-Data:
-128:	-4	16	 BREAKcycle: 5
-Registers
+data:
+128:	-4	16	
+====================
+cycle: 5 124	 BREAK
+
+registers:
 r00:	0	-4	0	0	0	0	0	0	
 r08:	0	0	0	0	0	0	0	0	
 r16:	0	0	0	0	0	0	0	0	
 r24:	0	0	0	0	0	0	0	0	
 
-Data:
+data:
 128:	-4	16	
