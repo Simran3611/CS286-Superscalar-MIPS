@@ -26,6 +26,11 @@ public class Main {
         String inputFile = args[1];
         String outputFilePrefix = args[3];
 
+        disassembly(inputFile, outputFilePrefix);
+        pipeline(outputFilePrefix);
+    }
+
+    public static void disassembly(String inputFile, String outputFilePrefix){
         byte[] bytes = readBinaryFile(inputFile);
         int memoryAddress = 96;
 
@@ -135,9 +140,18 @@ public class Main {
             writeToFile(disFileWriter, "\n");
 
             memoryAddress += 4;
-        }
 
-        FileWriter simFileWriter = getFileWriter(outputFilePrefix + "_sim.txt");
+            try {
+                disFileWriter.close();
+            } catch (IOException e){
+                System.out.println("Error closing disassembly output file");
+                System.exit(-1);
+            }
+        }
+    }
+
+    public static void pipeline(String outputFilePrefix){
+        FileWriter pipelineWriter = getFileWriter(outputFilePrefix + "_pipeline.txt");
 
         boolean isJumping = false;
         boolean endLoop = false;
@@ -148,9 +162,9 @@ public class Main {
         int HARD_STOP_CYCLE_LIMIT = 1000;
         int i = 0;
 
-        while (!endLoop){
+        while (!endLoop) {
 
-            if (i >= HARD_STOP_CYCLE_LIMIT){
+            if (i >= HARD_STOP_CYCLE_LIMIT) {
                 System.out.println("----------ENDLESS LOOP: SHUTTING DOWN---------");
                 System.exit(-1);
             }
@@ -164,8 +178,8 @@ public class Main {
                 continue;
             }*/
 
-            printAndWrite(simFileWriter, "--------------------");
-            printAndWrite(simFileWriter, String.format("Cycle: %s %s\t", cycle));
+            printAndWrite(pipelineWriter, "--------------------");
+            printAndWrite(pipelineWriter, String.format("Cycle: %s %s\t", cycle));
 
             WB();
             Mem();
@@ -248,13 +262,13 @@ public class Main {
 
             */
 
-            printAndWrite(simFileWriter, "Registers:\n");
-            printAndWrite(simFileWriter, createRegisterString());
-            printAndWrite(simFileWriter, "\n");
+            printAndWrite(pipelineWriter, "Registers:\n");
+            printAndWrite(pipelineWriter, createRegisterString());
+            printAndWrite(pipelineWriter, "\n");
 
-            printAndWrite(simFileWriter, "Data:");
-            printAndWrite(simFileWriter, createDataString());
-            printAndWrite(simFileWriter, "\n");
+            printAndWrite(pipelineWriter, "Data:");
+            printAndWrite(pipelineWriter, createDataString());
+            printAndWrite(pipelineWriter, "\n");
 
 
             cycle++;
@@ -267,15 +281,12 @@ public class Main {
             } else {
                 isJumping = false;
             }*/
-
-
         }
 
         try {
-            disFileWriter.close();
-            simFileWriter.close();
+            pipelineWriter.close();
         } catch (IOException e){
-            System.out.println("Error closing file");
+            System.out.println("Error closing pipeline output file");
             System.exit(-1);
         }
     }
