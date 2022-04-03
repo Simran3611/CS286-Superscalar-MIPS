@@ -442,11 +442,13 @@ public class Main {
     public static void Issue() {
 
     }
+
     public static void Mem() {
         if(preMem.peek() != null) {
             Instruction preMemValue = preMem.poll();
             switch (preMemValue.opcodeType) {
                 case SW:
+                    // cache logic possibly
                     break;
                 case LW:
                     postMem.add(preMemValue);
@@ -492,6 +494,10 @@ public class Main {
         }
         if(postMem.peek() != null) {
             Instruction postMemValue = postMem.poll();
+
+            if (postMemValue.opcodeType == Opcode.LW){
+                registers[postMemValue.rt] = postMemValue.immd + postMemValue.rs;
+            }
         }
     }
 }
