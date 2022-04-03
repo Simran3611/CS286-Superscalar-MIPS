@@ -14,5 +14,6 @@ public enum Opcode {
     J,
     INVALID,
     BLTZ,
+    BEQ,
     ERROR
 }
