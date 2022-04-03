@@ -17,6 +17,9 @@ public class Main {
     public static Queue<Instruction> postMem = new PriorityQueue<Instruction>();
     public static Queue<Instruction> postALU = new PriorityQueue<Instruction>();
 
+    public static int programCounter = 96;
+    public static boolean procStalled = false;
+    public static boolean programBreaked = false;
 
     public static void main(String[] args) {
         // ARGS: -i, "filename.bin", -o, "out_name"
@@ -139,7 +142,6 @@ public class Main {
         boolean isJumping = false;
         boolean endLoop = false;
 
-        int simMemoryAddress = 96;
         int cycle = 1;
 
         // i is just for checking for infinite loops
@@ -153,17 +155,25 @@ public class Main {
                 System.exit(-1);
             }
 
-            Instruction inst = instructions.get(simMemoryAddress);
+            /*
+            Instruction inst = instructions.get(programCounter);
 
             if (inst == null){
                 i++;
-                simMemoryAddress += 4;
+                programCounter += 4;
                 continue;
-            }
+            }*/
 
-            printAndWrite(simFileWriter, "====================\n");
-            printAndWrite(simFileWriter, String.format("cycle: %s %s\t", cycle, inst.memoryAddress));
+            printAndWrite(simFileWriter, "--------------------");
+            printAndWrite(simFileWriter, String.format("Cycle: %s %s\t", cycle));
 
+            WB();
+            Mem();
+            ALU();
+            Issue();
+            InstructionFetch();
+
+            /*
             switch (inst.opcodeType){
                 case ADD:
                     printAndWrite(simFileWriter, String.format(" ADD \t R%s, R%s, R%s", inst.rd, inst.rs, inst.rt));
@@ -235,25 +245,28 @@ public class Main {
             printAndWrite(simFileWriter, "\n");
             printAndWrite(simFileWriter, "\n");
 
-            printAndWrite(simFileWriter, "registers:\n");
+
+            */
+
+            printAndWrite(simFileWriter, "Registers:\n");
             printAndWrite(simFileWriter, createRegisterString());
             printAndWrite(simFileWriter, "\n");
 
-            printAndWrite(simFileWriter, "data:");
+            printAndWrite(simFileWriter, "Data:");
             printAndWrite(simFileWriter, createDataString());
             printAndWrite(simFileWriter, "\n");
-
 
 
             cycle++;
             i++;
 
+            /*
             // we don't want to add 4 to the jump address and mess stuff up
             if (!isJumping){
                 simMemoryAddress += 4;
             } else {
                 isJumping = false;
-            }
+            }*/
 
 
         }
@@ -383,7 +396,37 @@ public class Main {
         return temp;
     }
     public static void InstructionFetch() {
+        // before we fetch an instruction, we have to meet 2 criteria
+        // 1. We must not be stalling
+        // 2. There must be room in the pre issue buffer
+        // 2a. If there is only one slot in pre issue open, we can only fetch one instruction
 
+        if (procStalled){
+            return;
+        } else if (programBreaked){
+            return;
+        }
+
+        // fetch as many instructions as we can
+        // if we want to implement a cache, this must be restructured
+        for (int i = preIssueBuffer.size(); i < 2; i++){
+            Instruction instruction = instructions.get(programCounter);
+
+            if (instruction.opcodeType == Opcode.INVALID || instruction.opcodeType == Opcode.NOP){
+                continue;
+            } else if (instruction.opcodeType == Opcode.BREAK){
+                programBreaked = true;
+                return;
+            } else if (instruction.opcodeType == Opcode.BLTZ
+                    || instruction.opcodeType == Opcode.BEQ
+                    || instruction.opcodeType == Opcode.J
+                    || instruction.opcodeType == Opcode.JR){
+                // branch logic
+            }
+
+            preIssueBuffer.add(instruction);
+            programCounter += 4;
+        }
     }
     public static void Issue() {
 
