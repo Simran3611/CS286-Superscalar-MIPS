@@ -2,20 +2,24 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public class Main {
 
     private static final int MAX_REGISTERS = 32;
+    private static final int PRE_ISSUE_SIZE = 4;
+    private static final int PRE_SIZE = 2;
+    private static final int POST_SIZE = 1;
 
     public static int[] registers = new int[MAX_REGISTERS];
     public static ArrayList<Integer> dataAddresses = new ArrayList<>();
     public static Map<Integer, Integer> data = new HashMap<>();
     public static Map<Integer, Instruction> instructions = new HashMap<>();
-    public static Queue<Instruction> preIssueBuffer = new PriorityQueue<Instruction>();
-    public static Queue<Instruction> preALU = new PriorityQueue<Instruction>();
-    public static Queue<Instruction> preMem = new PriorityQueue<Instruction>();
-    public static Queue<Instruction> postMem = new PriorityQueue<Instruction>();
-    public static Queue<Instruction> postALU = new PriorityQueue<Instruction>();
+    public static Queue<Instruction> preIssueBuffer = new LinkedBlockingQueue<>(PRE_ISSUE_SIZE);
+    public static Queue<Instruction> preALU = new LinkedBlockingQueue<>(PRE_SIZE);
+    public static Queue<Instruction> preMem = new LinkedBlockingQueue<>(PRE_SIZE);
+    public static Queue<Instruction> postMem = new LinkedBlockingQueue<>(POST_SIZE);
+    public static Queue<Instruction> postALU = new LinkedBlockingQueue<>(POST_SIZE);
 
     public static int programCounter = 96;
     public static boolean procStalled = false;
@@ -179,7 +183,7 @@ public class Main {
             }*/
 
             printAndWrite(pipelineWriter, "--------------------");
-            printAndWrite(pipelineWriter, String.format("Cycle: %s %s\t", cycle));
+            printAndWrite(pipelineWriter, String.format("Cycle: %s\t", cycle));
 
             WB();
             Mem();
@@ -420,7 +424,10 @@ public class Main {
 
         // fetch as many instructions as we can
         // if we want to implement a cache, this must be restructured
-        for (int i = preIssueBuffer.size(); i < 2; i++){
+
+        int instructionsToFetch = Math.min(PRE_ISSUE_SIZE - preIssueBuffer.size(), 2);
+
+        for (int i = 0; i < instructionsToFetch; i++){
             Instruction instruction = instructions.get(programCounter);
 
             if (instruction.opcodeType == Opcode.INVALID || instruction.opcodeType == Opcode.NOP){
