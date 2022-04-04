@@ -140,13 +140,13 @@ public class Main {
             writeToFile(disFileWriter, "\n");
 
             memoryAddress += 4;
+        }
 
-            try {
-                disFileWriter.close();
-            } catch (IOException e){
-                System.out.println("Error closing disassembly output file");
-                System.exit(-1);
-            }
+        try {
+            disFileWriter.close();
+        } catch (IOException e){
+            System.out.println("Error closing disassembly output file");
+            System.exit(-1);
         }
     }
 
