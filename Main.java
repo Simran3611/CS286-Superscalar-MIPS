@@ -11,7 +11,7 @@ public class Main {
     public static ArrayList<Integer> dataAddresses = new ArrayList<>();
     public static Map<Integer, Integer> data = new HashMap<>();
     public static Map<Integer, Instruction> instructions = new HashMap<>();
-    public static Queue<Instruction> preIssueBuffer = new PriorityQueue<Instruction>();
+    public static Queue<Instruction> preIssue = new PriorityQueue<Instruction>();
     public static Queue<Instruction> preALU = new PriorityQueue<Instruction>();
     public static Queue<Instruction> preMem = new PriorityQueue<Instruction>();
     public static Queue<Instruction> postMem = new PriorityQueue<Instruction>();
@@ -386,7 +386,54 @@ public class Main {
 
     }
     public static void Issue() {
+        // there are 4 values in the preIssue Buffer so it takes those 4 values and puts 2 in pre-mem and 2 in pre-alu
 
+        //Write before write hazards (WBW) Output dependency
+        //If the rd register of the previous instruction matches the rd register of the current instructions than we have a WBW
+        //This hazard stays for 2 instructions.
+
+        //Write before read hazards (WBR) Antidependency
+        //if the rs or rt registers of the previous instruction matches the current instructions rd register than we have an antidependency
+        //This dependency stays for 2 instructions.
+
+        //Read before write (RBW) True data dependency
+        //if the rd register of the previous instruction matches the current instructions rt or rs registers than have a data dependency
+        //This dependency stays for 2 instructions.
+        int count = 2;
+        Instruction value = preIssue.poll();
+        if(preIssue.peek() != null) {
+            while(count != 0) {
+                switch (value.opcodeType) {
+                    case ADD:
+                        preALU.add(value);
+                        break;
+                    case SUB:
+                        preALU.add(value);
+                        break;
+                    case ADDI:
+                        preALU.add(value);
+                        break;
+                    case SLL:
+                        preALU.add(value);
+                        break;
+                    case SRL:
+                        preALU.add(value);
+                        break;
+                    case MUL:
+                        preALU.add(value);
+                        break;
+                    case MOVZ:
+                        preALU.add(value);
+                        break;
+                    case SW:
+                        preMem.add(value);
+                        break;
+                    case LW:
+                        preMem.add(value);
+                        break;
+                }
+            }
+        }
     }
     public static void Mem() {
         if(preMem.peek() != null) {
@@ -401,6 +448,7 @@ public class Main {
         }
     }
     public static void ALU() {
+        //the postALU has one entry and stores the instruction with the destination ID and the result of the ALU operation.
         if(preALU.peek() != null) {
             Instruction preALUValue = preALU.poll();
             postALU.add(preALUValue);
