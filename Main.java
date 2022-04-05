@@ -191,6 +191,12 @@ public class Main {
             Issue();
             InstructionFetch();
 
+            printAndWrite(pipelineWriter, "Pre-Issue Buffer:");
+            printAndWrite(pipelineWriter, "Pre_ALU Queue:");
+            printAndWrite(pipelineWriter, "Post_ALU Queue:");
+            printAndWrite(pipelineWriter, "Pre_MEM Queue:");
+            printAndWrite(pipelineWriter, "Post_MEM Queue:");
+
             /*
             switch (inst.opcodeType){
                 case ADD:
@@ -410,6 +416,7 @@ public class Main {
 
         return temp;
     }
+
     public static void InstructionFetch() {
         // before we fetch an instruction, we have to meet 2 criteria
         // 1. We must not be stalling
@@ -446,8 +453,30 @@ public class Main {
             programCounter += 4;
         }
     }
-    public static void Issue() {
 
+    public static void Issue() {
+        int instructionsToIssue = Math.min(preIssueBuffer.size(), 2);
+
+
+        for (int i = 0; i < instructionsToIssue; i++){
+            Instruction instruction = preIssueBuffer.peek();
+
+            switch (instruction.opcodeType){
+                case SW:
+                case LW:
+                    if (preMem.size() < PRE_SIZE){
+                        preMem.add(instruction);
+                        preIssueBuffer.poll();
+                    }
+                    break;
+                default:
+                    if (preALU.size() < PRE_SIZE){
+                        preALU.add(instruction);
+                        preIssueBuffer.poll();
+                    }
+                    break;
+            }
+        }
     }
 
     public static void Mem() {
@@ -463,12 +492,14 @@ public class Main {
             }
         }
     }
+
     public static void ALU() {
         if(preALU.peek() != null) {
             Instruction preALUValue = preALU.poll();
             postALU.add(preALUValue);
         }
     }
+
     public static void WB() {
         if(postALU.peek() != null) {
             Instruction postALUValue = postALU.poll();
@@ -506,6 +537,10 @@ public class Main {
                 registers[postMemValue.rt] = postMemValue.immd + postMemValue.rs;
             }
         }
+    }
+
+    public static boolean isRType(Instruction instruction){
+        return true;
     }
 }
 
