@@ -192,10 +192,15 @@ public class Main {
             InstructionFetch();
 
             printAndWrite(pipelineWriter, "Pre-Issue Buffer:");
+            printAndWrite(pipelineWriter, createBufferString(preIssueBuffer, PRE_ISSUE_SIZE));
             printAndWrite(pipelineWriter, "Pre_ALU Queue:");
+            printAndWrite(pipelineWriter, createBufferString(preALU, PRE_SIZE));
             printAndWrite(pipelineWriter, "Post_ALU Queue:");
+            printAndWrite(pipelineWriter, createBufferString(postALU, POST_SIZE));
             printAndWrite(pipelineWriter, "Pre_MEM Queue:");
+            printAndWrite(pipelineWriter, createBufferString(preMem, PRE_SIZE));
             printAndWrite(pipelineWriter, "Post_MEM Queue:");
+            printAndWrite(pipelineWriter, createBufferString(postMem, POST_SIZE));
 
             /*
             switch (inst.opcodeType){
@@ -299,6 +304,21 @@ public class Main {
             System.out.println("Error closing pipeline output file");
             System.exit(-1);
         }
+    }
+
+    private static String createBufferString(Queue<Instruction> buffer, int maxSize) {
+        String temp = "";
+        Instruction[] bufferedInstructions = (Instruction[]) buffer.toArray();
+        for (int i = 0; i < maxSize; i++){
+            try {
+                Instruction instruction = bufferedInstructions[i];
+                temp += String.format("Entry $s:\t[%s]", i, createMipsCommandString(instruction.sepStrings));
+            } catch (IndexOutOfBoundsException e){
+                temp += String.format("Entry $s:", i);
+            }
+            temp += "\n";
+        }
+        return temp;
     }
 
     public static byte[] readBinaryFile(String filename) {
