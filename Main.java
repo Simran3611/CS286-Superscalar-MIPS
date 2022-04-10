@@ -483,23 +483,50 @@ public class Main {
             bool isSW = false;
         6. Store instructions must be issued in order
          */
-
+        boolean isSW = false;
         for (int i = 0; i < instructionsToIssue; i++){
             Instruction instruction = preIssueBuffer.peek();
+            Instruction [] array = new Instruction[instructionsToIssue];
+            array[i] = instruction;
+                    if(i == 0) {
+                        continue;
+                    }
+                    else if (i == 1) {
+                        if(array[i].rd == (array[i-1].rd)) {
+                            //throw WBW hazard.
+                        }
+                        if(array[i].rd == array[i-1].rt || array[i].rd == array[i].rs) {
+                            //throw WBR hazard.
+                        }
+                        if(array[i].rt == array[i-1].rd || array[i].rs == array[i-1].rd) {
+                            //throw RBW hazard.
+                        }
+                    }
+                    else {
+                        if(array[i].rd == (array[i-1].rd) || (array[i].rd == (array[i-2].rd))) {
+                            //throw WBW hazard.
+                        }
+                        if(array[i].rd == array[i-1].rt || array[i].rd == array[i-1].rs || array[i].rd == array[i-2].rt || array[i].rd == array[i-2].rs) {
+                            //throw WBR hazard.
+                        }
+                        if(array[i].rt == array[i-1].rd || array[i].rs == array[i-1].rd || array[i].rt == array[i-2].rd || array[i].rs == array[i-2].rd) {
+                            //throw RBW hazard.
+                        }
+                    }
 
             switch (instruction.opcodeType){
                 case SW:
-                    //isSW = true;
+                    isSW = true;
                 case LW:
                     if (preMem.size() < PRE_SIZE){
-//                        if(isSW) {
+                        if(isSW) {
 //                            preMem.add(instruction); //DELETE
 //                            preIssueBuffer.poll(); //DELETE
-//                        }
-//                        else {
+                        }
+                        else {
                             preMem.add(instruction);
                             preIssueBuffer.poll();
-//                        }
+                        }
                     }
                     break;
                 default:
