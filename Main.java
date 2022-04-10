@@ -1,4 +1,5 @@
 import java.io.*;
+import java.lang.reflect.Array;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
@@ -27,10 +28,8 @@ public class Main {
 
     public static void main(String[] args) {
         // ARGS: -i, "filename.bin", -o, "out_name"
-//        String inputFile = args[1];
-//        String outputFilePrefix = args[3];
-        String inputFile = "t1.bin";
-        String outputFilePrefix = "t1.pipeline";
+        String inputFile = args[1];
+        String outputFilePrefix = args[3];
 
         disassembly(inputFile, outputFilePrefix);
         pipeline(outputFilePrefix);
@@ -177,6 +176,7 @@ public class Main {
 
             /*
             Instruction inst = instructions.get(programCounter);
+
             if (inst == null){
                 i++;
                 programCounter += 4;
@@ -184,7 +184,7 @@ public class Main {
             }*/
 
             printAndWrite(pipelineWriter, "--------------------");
-            printAndWrite(pipelineWriter, String.format("Cycle: %s\t", cycle));
+            printAndWrite(pipelineWriter, String.format("\nCycle: %s\t", cycle));
 
             WB();
             Mem();
@@ -192,11 +192,16 @@ public class Main {
             Issue();
             InstructionFetch();
 
-            printAndWrite(pipelineWriter, "Pre-Issue Buffer:");
-            printAndWrite(pipelineWriter, "Pre_ALU Queue:");
-            printAndWrite(pipelineWriter, "Post_ALU Queue:");
-            printAndWrite(pipelineWriter, "Pre_MEM Queue:");
-            printAndWrite(pipelineWriter, "Post_MEM Queue:");
+            printAndWrite(pipelineWriter, "\nPre-Issue Buffer:\n");
+            printAndWrite(pipelineWriter, createBufferString(preIssueBuffer, PRE_ISSUE_SIZE));
+            printAndWrite(pipelineWriter, "Pre_ALU Queue:\n");
+            printAndWrite(pipelineWriter, createBufferString(preALU, PRE_SIZE));
+            printAndWrite(pipelineWriter, "Post_ALU Queue:\n");
+            printAndWrite(pipelineWriter, createBufferString(postALU, POST_SIZE));
+            printAndWrite(pipelineWriter, "Pre_MEM Queue:\n");
+            printAndWrite(pipelineWriter, createBufferString(preMem, PRE_SIZE));
+            printAndWrite(pipelineWriter, "Post_MEM Queue:\n");
+            printAndWrite(pipelineWriter, createBufferString(postMem, POST_SIZE));
 
             /*
             switch (inst.opcodeType){
@@ -266,8 +271,11 @@ public class Main {
                     endLoop = true;
                     break;
             }
+
             printAndWrite(simFileWriter, "\n");
             printAndWrite(simFileWriter, "\n");
+
+
             */
 
             printAndWrite(pipelineWriter, "Registers:\n");
@@ -297,6 +305,21 @@ public class Main {
             System.out.println("Error closing pipeline output file");
             System.exit(-1);
         }
+    }
+
+    private static String createBufferString(Queue<Instruction> buffer, int maxSize) {
+        String temp = "";
+        Instruction[] bufferedInstructions = buffer.toArray(new Instruction[0]);
+        for (int i = 0; i < maxSize; i++){
+            try {
+                Instruction instruction = bufferedInstructions[i];
+                temp += String.format("\tEntry %s:\t[%s]", i, createReadableMipsInstruction(instruction));
+            } catch (IndexOutOfBoundsException e){
+                temp += String.format("\tEntry %s:", i);
+            }
+            temp += "\n";
+        }
+        return temp;
     }
 
     public static byte[] readBinaryFile(String filename) {
@@ -434,7 +457,7 @@ public class Main {
 
         for (int i = 0; i < instructionsToFetch; i++){
             Instruction instruction = instructions.get(programCounter);
-            //instruction seen to be null.
+
             if (instruction.opcodeType == Opcode.INVALID || instruction.opcodeType == Opcode.NOP){
                 continue;
             } else if (instruction.opcodeType == Opcode.BREAK){
@@ -468,6 +491,7 @@ public class Main {
             output dependency write before write
             Check the previous two instructions and see if their rd register matches the current instructions rd register
 
+
         3. No WBR hazards exist with earlier not-issued instructions (do not check
         for WBR hazards with instructions that have already been issued. In
         other words, you only need to check the earlier instructions in the preissue buffer and not in later buffers in the pipeline)
@@ -483,56 +507,71 @@ public class Main {
             bool isSW = false;
         6. Store instructions must be issued in order
          */
-        boolean isSW = false;
-        for (int i = 0; i < instructionsToIssue; i++){
+        int instructionsIssued = 0;
+
+        for (int i = 0; i < 4; i++){
+            if (instructionsIssued >= instructionsToIssue){
+                break;
+            }
+
             Instruction instruction = preIssueBuffer.peek();
-            Instruction [] array = new Instruction[instructionsToIssue];
-            array[i] = instruction;
-                    if(i == 0) {
-                        continue;
+
+            // nothing left in pre-issue
+            if (instruction == null){
+                break;
+            }
+
+            if(isRType(instruction)){
+                for (Instruction issuedInstructions : getAllIssuedInstructions()) {
+                    // true data dependency (read before write)
+                    if (instruction.rs == issuedInstructions.rd || instruction.rt == issuedInstructions.rd){
+                        break;
                     }
-                    else if (i == 1) {
-                        if(array[i].rd == (array[i-1].rd)) {
-                            //throw WBW hazard.
+                }
+
+                // assuming we are not at the first buffered instructions, check all instructions before this one
+                // in the pre issue buffer
+                if (i != 0){
+                    Instruction[] preIssueInstructions = preIssueBuffer.toArray(new Instruction[0]);
+                    for (int j = 0; j < i; j++){
+                        Instruction currentPreIssueInstruction = preIssueInstructions[j];
+                        // true data dependency in pre-issue
+                        if (instruction.rs == currentPreIssueInstruction.rd || instruction.rt == currentPreIssueInstruction.rd){
+                            break;
                         }
-                        if(array[i].rd == array[i-1].rt || array[i].rd == array[i].rs) {
-                            //throw WBR hazard.
-                        }
-                        if(array[i].rt == array[i-1].rd || array[i].rs == array[i-1].rd) {
-                            //throw RBW hazard.
-                        }
-                    }
-                    else {
-                        if(array[i].rd == (array[i-1].rd) || (array[i].rd == (array[i-2].rd))) {
-                            //throw WBW hazard.
-                        }
-                        if(array[i].rd == array[i-1].rt || array[i].rd == array[i-1].rs || array[i].rd == array[i-2].rt || array[i].rd == array[i-2].rs) {
-                            //throw WBR hazard.
-                        }
-                        if(array[i].rt == array[i-1].rd || array[i].rs == array[i-1].rd || array[i].rt == array[i-2].rd || array[i].rs == array[i-2].rd) {
-                            //throw RBW hazard.
+
+                        // write before read
+                        if (instruction.rd == currentPreIssueInstruction.rs || instruction.rd == currentPreIssueInstruction.rt){
+                            break;
                         }
                     }
+                }
+            }
+
+            if (isIType(instruction)){
+
+            }
+
+            // We need to also check for LW and SW
+            // LWs cannot be issued until all SWs before it have been issue
+            // SWs must be sequential
 
             switch (instruction.opcodeType){
                 case SW:
-                    isSW = true;
                 case LW:
                     if (preMem.size() < PRE_SIZE){
-                        if(isSW) {
-//                            preMem.add(instruction); //DELETE
-//                            preIssueBuffer.poll(); //DELETE
-                        }
-                        else {
-                            preMem.add(instruction);
-                            preIssueBuffer.poll();
-                        }
+                        preMem.add(instruction);
+                        preIssueBuffer.poll();
+
+                        instructionsIssued++;
                     }
                     break;
                 default:
                     if (preALU.size() < PRE_SIZE){
                         preALU.add(instruction);
                         preIssueBuffer.poll();
+
+                        instructionsIssued++;
                     }
                     break;
             }
@@ -599,7 +638,81 @@ public class Main {
         }
     }
 
+    // needs to be implemented
     public static boolean isRType(Instruction instruction){
         return true;
     }
+
+    // needs to be implemented
+    private static boolean isIType(Instruction instruction) {
+        return true;
+    }
+
+    public static List<Instruction> getAllIssuedInstructions(){
+        Instruction[] preA = preALU.toArray(new Instruction[0]);
+        Instruction[] preM = preMem.toArray(new Instruction[0]);
+        Instruction[] postA = postALU.toArray(new Instruction[0]);
+        Instruction[] postM = postMem.toArray(new Instruction[0]);
+
+        List<Instruction> issuedInstructions = new ArrayList<>();
+
+        for (Instruction i : preA){
+            issuedInstructions.add(i);
+        }
+
+        for (Instruction i : preM){
+            issuedInstructions.add(i);
+        }
+
+        for (Instruction i : postA){
+            issuedInstructions.add(i);
+        }
+
+        for (Instruction i : postM){
+            issuedInstructions.add(i);
+        }
+
+        return issuedInstructions;
+    }
+
+    public static String createReadableMipsInstruction(Instruction instruction){
+        if (instruction.valid == 0){
+            return " Invalid Instruction";
+        }
+
+        switch (instruction.opcodeType){
+            case ADDI:
+                return String.format(" ADDI\t R%s, R%s, #%s", instruction.rt, instruction.rs, instruction.immd);
+            case NOP:
+                return " NOP";
+            case SW:
+                return String.format(" SW  \t R%s, %s(R%s)", instruction.rt, instruction.immd, instruction.rs);
+            case SLL:
+                return String.format(" SLL\t R%s, R%s, #%s", instruction.rd, instruction.rt, instruction.sa);
+            case SRL:
+                return String.format(" SRL\t R%s, R%s, #%s", instruction.rd, instruction.rt, instruction.sa);
+            case SUB:
+                return String.format(" SUB \t R%s, R%s, R%s", instruction.rd, instruction.rs, instruction.rt);
+            case ADD:
+                return String.format(" ADD \t R%s, R%s, R%s", instruction.rd, instruction.rs, instruction.rt);
+            case LW:
+                return String.format(" LW  \t R%s, %s(R%s)", instruction.rt, instruction.immd, instruction.rs);
+            case J:
+                return String.format(" J  \t #%s", instruction.j);
+            case BLTZ:
+                return String.format(" BLTZ\t R%s, #%s", instruction.rs, instruction.immd);
+            case JR:
+                return String.format(" JR  \t R%s", instruction.rs);
+            case BREAK:
+                return " BREAK";
+            case MUL:
+                return String.format(" MUL \t R%s, R%s, R%s", instruction.rd, instruction.rs, instruction.rt);
+            case MOVZ:
+                return String.format(" MOVZ\t R%s, R%S, R%s", instruction.rd, instruction.rs, instruction.rt);
+            default:
+                return " ERROR";
+        }
+    }
 }
+
+
