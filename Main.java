@@ -2,27 +2,41 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public class Main {
 
     private static final int MAX_REGISTERS = 32;
+    private static final int PRE_ISSUE_SIZE = 4;
+    private static final int PRE_SIZE = 2;
+    private static final int POST_SIZE = 1;
 
     public static int[] registers = new int[MAX_REGISTERS];
     public static ArrayList<Integer> dataAddresses = new ArrayList<>();
     public static Map<Integer, Integer> data = new HashMap<>();
     public static Map<Integer, Instruction> instructions = new HashMap<>();
-    public static Queue<Instruction> preIssueBuffer = new PriorityQueue<Instruction>();
-    public static Queue<Instruction> preALU = new PriorityQueue<Instruction>();
-    public static Queue<Instruction> preMem = new PriorityQueue<Instruction>();
-    public static Queue<Instruction> postMem = new PriorityQueue<Instruction>();
-    public static Queue<Instruction> postALU = new PriorityQueue<Instruction>();
+    public static Queue<Instruction> preIssueBuffer = new LinkedBlockingQueue<>(PRE_ISSUE_SIZE);
+    public static Queue<Instruction> preALU = new LinkedBlockingQueue<>(PRE_SIZE);
+    public static Queue<Instruction> preMem = new LinkedBlockingQueue<>(PRE_SIZE);
+    public static Queue<Instruction> postMem = new LinkedBlockingQueue<>(POST_SIZE);
+    public static Queue<Instruction> postALU = new LinkedBlockingQueue<>(POST_SIZE);
 
+    public static int programCounter = 96;
+    public static boolean procStalled = false;
+    public static boolean programBreaked = false;
 
     public static void main(String[] args) {
         // ARGS: -i, "filename.bin", -o, "out_name"
-        String inputFile = args[1];
-        String outputFilePrefix = args[3];
+//        String inputFile = args[1];
+//        String outputFilePrefix = args[3];
+        String inputFile = "t1.bin";
+        String outputFilePrefix = "t1.pipeline";
 
+        disassembly(inputFile, outputFilePrefix);
+        pipeline(outputFilePrefix);
+    }
+
+    public static void disassembly(String inputFile, String outputFilePrefix){
         byte[] bytes = readBinaryFile(inputFile);
         int memoryAddress = 96;
 
@@ -134,36 +148,57 @@ public class Main {
             memoryAddress += 4;
         }
 
-        FileWriter simFileWriter = getFileWriter(outputFilePrefix + "_sim.txt");
+        try {
+            disFileWriter.close();
+        } catch (IOException e){
+            System.out.println("Error closing disassembly output file");
+            System.exit(-1);
+        }
+    }
+
+    public static void pipeline(String outputFilePrefix){
+        FileWriter pipelineWriter = getFileWriter(outputFilePrefix + "_pipeline.txt");
 
         boolean isJumping = false;
         boolean endLoop = false;
 
-        int simMemoryAddress = 96;
         int cycle = 1;
 
         // i is just for checking for infinite loops
         int HARD_STOP_CYCLE_LIMIT = 1000;
         int i = 0;
 
-        while (!endLoop){
+        while (!endLoop) {
 
-            if (i >= HARD_STOP_CYCLE_LIMIT){
+            if (i >= HARD_STOP_CYCLE_LIMIT) {
                 System.out.println("----------ENDLESS LOOP: SHUTTING DOWN---------");
                 System.exit(-1);
             }
 
-            Instruction inst = instructions.get(simMemoryAddress);
-
+            /*
+            Instruction inst = instructions.get(programCounter);
             if (inst == null){
                 i++;
-                simMemoryAddress += 4;
+                programCounter += 4;
                 continue;
-            }
+            }*/
 
-            printAndWrite(simFileWriter, "====================\n");
-            printAndWrite(simFileWriter, String.format("cycle: %s %s\t", cycle, inst.memoryAddress));
+            printAndWrite(pipelineWriter, "--------------------");
+            printAndWrite(pipelineWriter, String.format("Cycle: %s\t", cycle));
 
+            WB();
+            Mem();
+            ALU();
+            Issue();
+            InstructionFetch();
+
+            printAndWrite(pipelineWriter, "Pre-Issue Buffer:");
+            printAndWrite(pipelineWriter, "Pre_ALU Queue:");
+            printAndWrite(pipelineWriter, "Post_ALU Queue:");
+            printAndWrite(pipelineWriter, "Pre_MEM Queue:");
+            printAndWrite(pipelineWriter, "Post_MEM Queue:");
+
+            /*
             switch (inst.opcodeType){
                 case ADD:
                     printAndWrite(simFileWriter, String.format(" ADD \t R%s, R%s, R%s", inst.rd, inst.rs, inst.rt));
@@ -231,38 +266,35 @@ public class Main {
                     endLoop = true;
                     break;
             }
-
             printAndWrite(simFileWriter, "\n");
             printAndWrite(simFileWriter, "\n");
+            */
 
-            printAndWrite(simFileWriter, "registers:\n");
-            printAndWrite(simFileWriter, createRegisterString());
-            printAndWrite(simFileWriter, "\n");
+            printAndWrite(pipelineWriter, "Registers:\n");
+            printAndWrite(pipelineWriter, createRegisterString());
+            printAndWrite(pipelineWriter, "\n");
 
-            printAndWrite(simFileWriter, "data:");
-            printAndWrite(simFileWriter, createDataString());
-            printAndWrite(simFileWriter, "\n");
-
+            printAndWrite(pipelineWriter, "Data:");
+            printAndWrite(pipelineWriter, createDataString());
+            printAndWrite(pipelineWriter, "\n");
 
 
             cycle++;
             i++;
 
+            /*
             // we don't want to add 4 to the jump address and mess stuff up
             if (!isJumping){
                 simMemoryAddress += 4;
             } else {
                 isJumping = false;
-            }
-
-
+            }*/
         }
 
         try {
-            disFileWriter.close();
-            simFileWriter.close();
+            pipelineWriter.close();
         } catch (IOException e){
-            System.out.println("Error closing file");
+            System.out.println("Error closing pipeline output file");
             System.exit(-1);
         }
     }
@@ -382,17 +414,110 @@ public class Main {
 
         return temp;
     }
+
     public static void InstructionFetch() {
+        // before we fetch an instruction, we have to meet 2 criteria
+        // 1. We must not be stalling
+        // 2. There must be room in the pre issue buffer
+        // 2a. If there is only one slot in pre issue open, we can only fetch one instruction
 
+        if (procStalled){
+            return;
+        } else if (programBreaked){
+            return;
+        }
+
+        // fetch as many instructions as we can
+        // if we want to implement a cache, this must be restructured
+
+        int instructionsToFetch = Math.min(PRE_ISSUE_SIZE - preIssueBuffer.size(), 2);
+
+        for (int i = 0; i < instructionsToFetch; i++){
+            Instruction instruction = instructions.get(programCounter);
+            //instruction seen to be null.
+            if (instruction.opcodeType == Opcode.INVALID || instruction.opcodeType == Opcode.NOP){
+                continue;
+            } else if (instruction.opcodeType == Opcode.BREAK){
+                programBreaked = true;
+                return;
+            } else if (instruction.opcodeType == Opcode.BLTZ
+                    || instruction.opcodeType == Opcode.BEQ
+                    || instruction.opcodeType == Opcode.J
+                    || instruction.opcodeType == Opcode.JR){
+                // branch logic
+            }
+
+            preIssueBuffer.add(instruction);
+            programCounter += 4;
+        }
     }
+
     public static void Issue() {
+        int instructionsToIssue = Math.min(preIssueBuffer.size(), 2);
+        /*
+        1. No structural hazards exist (there is room in the pre-mem/pre-ALU destination buffer)
+        if (instructionsToIssue != 0) {
+            continue;
+        }
+        else {
+            exit;
+        }
 
+        2. No WBW hazards exist active instructions (issued but not finished, or
+        earlier no-issued instructions)
+            output dependency write before write
+            Check the previous two instructions and see if their rd register matches the current instructions rd register
+
+        3. No WBR hazards exist with earlier not-issued instructions (do not check
+        for WBR hazards with instructions that have already been issued. In
+        other words, you only need to check the earlier instructions in the preissue buffer and not in later buffers in the pipeline)
+            Antidependency write before read
+            Look at the previous 2 instructions and see if rs or rt registers match the rd register of the current instruction
+
+        4. No RBW hazards (true data dependencies) exist with active instructions
+        (all operands are ready)
+            true data dependency read before write
+            Look at the previous 2 registers and see if their rd register matches the current instructions rt or rs register
+
+        5. A load instruction must wait for all previous stores to be issued
+            bool isSW = false;
+        6. Store instructions must be issued in order
+         */
+
+        for (int i = 0; i < instructionsToIssue; i++){
+            Instruction instruction = preIssueBuffer.peek();
+
+            switch (instruction.opcodeType){
+                case SW:
+                    //isSW = true;
+                case LW:
+                    if (preMem.size() < PRE_SIZE){
+//                        if(isSW) {
+//                            preMem.add(instruction); //DELETE
+//                            preIssueBuffer.poll(); //DELETE
+//                        }
+//                        else {
+                            preMem.add(instruction);
+                            preIssueBuffer.poll();
+//                        }
+                    }
+                    break;
+                default:
+                    if (preALU.size() < PRE_SIZE){
+                        preALU.add(instruction);
+                        preIssueBuffer.poll();
+                    }
+                    break;
+            }
+        }
     }
+
     public static void Mem() {
         if(preMem.peek() != null) {
             Instruction preMemValue = preMem.poll();
             switch (preMemValue.opcodeType) {
                 case SW:
+                    // cache logic possibly
                     break;
                 case LW:
                     postMem.add(preMemValue);
@@ -400,12 +525,14 @@ public class Main {
             }
         }
     }
+
     public static void ALU() {
         if(preALU.peek() != null) {
             Instruction preALUValue = preALU.poll();
             postALU.add(preALUValue);
         }
     }
+
     public static void WB() {
         if(postALU.peek() != null) {
             Instruction postALUValue = postALU.poll();
@@ -438,8 +565,14 @@ public class Main {
         }
         if(postMem.peek() != null) {
             Instruction postMemValue = postMem.poll();
+
+            if (postMemValue.opcodeType == Opcode.LW){
+                registers[postMemValue.rt] = postMemValue.immd + postMemValue.rs;
+            }
         }
     }
+
+    public static boolean isRType(Instruction instruction){
+        return true;
+    }
 }
-
-
