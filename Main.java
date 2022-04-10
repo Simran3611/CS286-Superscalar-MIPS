@@ -552,6 +552,10 @@ public class Main {
 
             }
 
+            // We need to also check for LW and SW
+            // LWs cannot be issued until all SWs before it have been issue
+            // SWs must be sequential
+
             switch (instruction.opcodeType){
                 case SW:
                 case LW:
@@ -572,10 +576,6 @@ public class Main {
                     break;
             }
         }
-    }
-
-    private static boolean isIType(Instruction instruction) {
-        return true;
     }
 
     public static void Mem() {
@@ -638,7 +638,13 @@ public class Main {
         }
     }
 
+    // needs to be implemented
     public static boolean isRType(Instruction instruction){
+        return true;
+    }
+
+    // needs to be implemented
+    private static boolean isIType(Instruction instruction) {
         return true;
     }
 
