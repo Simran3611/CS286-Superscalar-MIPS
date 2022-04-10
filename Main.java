@@ -1,4 +1,5 @@
 import java.io.*;
+import java.lang.reflect.Array;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
@@ -183,7 +184,7 @@ public class Main {
             }*/
 
             printAndWrite(pipelineWriter, "--------------------");
-            printAndWrite(pipelineWriter, String.format("Cycle: %s\t", cycle));
+            printAndWrite(pipelineWriter, String.format("\nCycle: %s\t", cycle));
 
             WB();
             Mem();
@@ -191,15 +192,15 @@ public class Main {
             Issue();
             InstructionFetch();
 
-            printAndWrite(pipelineWriter, "Pre-Issue Buffer:");
+            printAndWrite(pipelineWriter, "\nPre-Issue Buffer:\n");
             printAndWrite(pipelineWriter, createBufferString(preIssueBuffer, PRE_ISSUE_SIZE));
-            printAndWrite(pipelineWriter, "Pre_ALU Queue:");
+            printAndWrite(pipelineWriter, "Pre_ALU Queue:\n");
             printAndWrite(pipelineWriter, createBufferString(preALU, PRE_SIZE));
-            printAndWrite(pipelineWriter, "Post_ALU Queue:");
+            printAndWrite(pipelineWriter, "Post_ALU Queue:\n");
             printAndWrite(pipelineWriter, createBufferString(postALU, POST_SIZE));
-            printAndWrite(pipelineWriter, "Pre_MEM Queue:");
+            printAndWrite(pipelineWriter, "Pre_MEM Queue:\n");
             printAndWrite(pipelineWriter, createBufferString(preMem, PRE_SIZE));
-            printAndWrite(pipelineWriter, "Post_MEM Queue:");
+            printAndWrite(pipelineWriter, "Post_MEM Queue:\n");
             printAndWrite(pipelineWriter, createBufferString(postMem, POST_SIZE));
 
             /*
@@ -308,13 +309,13 @@ public class Main {
 
     private static String createBufferString(Queue<Instruction> buffer, int maxSize) {
         String temp = "";
-        Instruction[] bufferedInstructions = (Instruction[]) buffer.toArray();
+        Instruction[] bufferedInstructions = buffer.toArray(new Instruction[0]);
         for (int i = 0; i < maxSize; i++){
             try {
                 Instruction instruction = bufferedInstructions[i];
-                temp += String.format("Entry $s:\t[%s]", i, createMipsCommandString(instruction.sepStrings));
+                temp += String.format("\tEntry %s:\t[%s]", i, createReadableMipsInstruction(instruction));
             } catch (IndexOutOfBoundsException e){
-                temp += String.format("Entry $s:", i);
+                temp += String.format("\tEntry %s:", i);
             }
             temp += "\n";
         }
@@ -476,10 +477,50 @@ public class Main {
 
     public static void Issue() {
         int instructionsToIssue = Math.min(preIssueBuffer.size(), 2);
+        int instructionsIssued = 0;
 
+        for (int i = 0; i < 4; i++){
+            if (instructionsIssued >= instructionsToIssue){
+                break;
+            }
 
-        for (int i = 0; i < instructionsToIssue; i++){
             Instruction instruction = preIssueBuffer.peek();
+
+            // nothing left in pre-issue
+            if (instruction == null){
+                break;
+            }
+
+            if(isRType(instruction)){
+                for (Instruction issuedInstructions : getAllIssuedInstructions()) {
+                    // true data dependency (read before write)
+                    if (instruction.rs == issuedInstructions.rd || instruction.rt == issuedInstructions.rd){
+                        break;
+                    }
+                }
+
+                // assuming we are not at the first buffered instructions, check all instructions before this one
+                // in the pre issue buffer
+                if (i != 0){
+                    Instruction[] preIssueInstructions = preIssueBuffer.toArray(new Instruction[0]);
+                    for (int j = 0; j < i; j++){
+                        Instruction currentPreIssueInstruction = preIssueInstructions[j];
+                        // true data dependency in pre-issue
+                        if (instruction.rs == currentPreIssueInstruction.rd || instruction.rt == currentPreIssueInstruction.rd){
+                            break;
+                        }
+
+                        // write before read
+                        if (instruction.rd == currentPreIssueInstruction.rs || instruction.rd == currentPreIssueInstruction.rt){
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (isIType(instruction)){
+
+            }
 
             switch (instruction.opcodeType){
                 case SW:
@@ -487,16 +528,24 @@ public class Main {
                     if (preMem.size() < PRE_SIZE){
                         preMem.add(instruction);
                         preIssueBuffer.poll();
+
+                        instructionsIssued++;
                     }
                     break;
                 default:
                     if (preALU.size() < PRE_SIZE){
                         preALU.add(instruction);
                         preIssueBuffer.poll();
+
+                        instructionsIssued++;
                     }
                     break;
             }
         }
+    }
+
+    private static boolean isIType(Instruction instruction) {
+        return true;
     }
 
     public static void Mem() {
@@ -561,6 +610,72 @@ public class Main {
 
     public static boolean isRType(Instruction instruction){
         return true;
+    }
+
+    public static List<Instruction> getAllIssuedInstructions(){
+        Instruction[] preA = preALU.toArray(new Instruction[0]);
+        Instruction[] preM = preMem.toArray(new Instruction[0]);
+        Instruction[] postA = postALU.toArray(new Instruction[0]);
+        Instruction[] postM = postMem.toArray(new Instruction[0]);
+
+        List<Instruction> issuedInstructions = new ArrayList<>();
+
+        for (Instruction i : preA){
+            issuedInstructions.add(i);
+        }
+
+        for (Instruction i : preM){
+            issuedInstructions.add(i);
+        }
+
+        for (Instruction i : postA){
+            issuedInstructions.add(i);
+        }
+
+        for (Instruction i : postM){
+            issuedInstructions.add(i);
+        }
+
+        return issuedInstructions;
+    }
+
+    public static String createReadableMipsInstruction(Instruction instruction){
+        if (instruction.valid == 0){
+            return " Invalid Instruction";
+        }
+
+        switch (instruction.opcodeType){
+            case ADDI:
+                return String.format(" ADDI\t R%s, R%s, #%s", instruction.rt, instruction.rs, instruction.immd);
+            case NOP:
+                return " NOP";
+            case SW:
+                return String.format(" SW  \t R%s, %s(R%s)", instruction.rt, instruction.immd, instruction.rs);
+            case SLL:
+                return String.format(" SLL\t R%s, R%s, #%s", instruction.rd, instruction.rt, instruction.sa);
+            case SRL:
+                return String.format(" SRL\t R%s, R%s, #%s", instruction.rd, instruction.rt, instruction.sa);
+            case SUB:
+                return String.format(" SUB \t R%s, R%s, R%s", instruction.rd, instruction.rs, instruction.rt);
+            case ADD:
+                return String.format(" ADD \t R%s, R%s, R%s", instruction.rd, instruction.rs, instruction.rt);
+            case LW:
+                return String.format(" LW  \t R%s, %s(R%s)", instruction.rt, instruction.immd, instruction.rs);
+            case J:
+                return String.format(" J  \t #%s", instruction.j);
+            case BLTZ:
+                return String.format(" BLTZ\t R%s, #%s", instruction.rs, instruction.immd);
+            case JR:
+                return String.format(" JR  \t R%s", instruction.rs);
+            case BREAK:
+                return " BREAK";
+            case MUL:
+                return String.format(" MUL \t R%s, R%s, R%s", instruction.rd, instruction.rs, instruction.rt);
+            case MOVZ:
+                return String.format(" MOVZ\t R%s, R%S, R%s", instruction.rd, instruction.rs, instruction.rt);
+            default:
+                return " ERROR";
+        }
     }
 }
 
