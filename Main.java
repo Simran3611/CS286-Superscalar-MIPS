@@ -477,6 +477,36 @@ public class Main {
 
     public static void Issue() {
         int instructionsToIssue = Math.min(preIssueBuffer.size(), 2);
+        /*
+        1. No structural hazards exist (there is room in the pre-mem/pre-ALU destination buffer)
+        if (instructionsToIssue != 0) {
+            continue;
+        }
+        else {
+            exit;
+        }
+
+        2. No WBW hazards exist active instructions (issued but not finished, or
+        earlier no-issued instructions)
+            output dependency write before write
+            Check the previous two instructions and see if their rd register matches the current instructions rd register
+
+
+        3. No WBR hazards exist with earlier not-issued instructions (do not check
+        for WBR hazards with instructions that have already been issued. In
+        other words, you only need to check the earlier instructions in the preissue buffer and not in later buffers in the pipeline)
+            Antidependency write before read
+            Look at the previous 2 instructions and see if rs or rt registers match the rd register of the current instruction
+
+        4. No RBW hazards (true data dependencies) exist with active instructions
+        (all operands are ready)
+            true data dependency read before write
+            Look at the previous 2 registers and see if their rd register matches the current instructions rt or rs register
+
+        5. A load instruction must wait for all previous stores to be issued
+            bool isSW = false;
+        6. Store instructions must be issued in order
+         */
         int instructionsIssued = 0;
 
         for (int i = 0; i < 4; i++){
