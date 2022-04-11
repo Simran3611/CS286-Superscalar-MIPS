@@ -522,30 +522,39 @@ public class Main {
             }
 
             if(isRType(instruction)){
-                if (isThereWBRHazard(new int[]{instruction.rs, instruction.rt})) break;
+                if (isThereRBWHazard(getAllIssuedInstructions(), new int[]{instruction.rs, instruction.rt})) break;
+            }
 
-                // assuming we are not at the first buffered instructions, check all instructions before this one
-                // in the pre issue buffer
-                if (i != 0){
-                    Instruction[] preIssueInstructions = preIssueBuffer.toArray(new Instruction[0]);
-                    for (int j = 0; j < i; j++){
-                        Instruction currentPreIssueInstruction = preIssueInstructions[j];
+            if (isIType(instruction)){
+                if (isThereRBWHazard(getAllIssuedInstructions(), new int[]{instruction.rs})) break;
+            }
+
+            // assuming we are not at the first buffered instructions, check all instructions before this one
+            // in the pre issue buffer
+            if (i != 0){
+                Instruction[] preIssueInstructions = preIssueBuffer.toArray(new Instruction[0]);
+                for (int j = 0; j < i; j++){
+                    Instruction currentPreIssueInstruction = preIssueInstructions[j];
+
+                    if (isRType(instruction)){
                         // true data dependency in pre-issue
-                        if (instruction.rs == currentPreIssueInstruction.rd || instruction.rt == currentPreIssueInstruction.rd){
-                            break;
-                        }
+                        if (isThereRBWHazard(currentPreIssueInstruction, new int[]{instruction.rs, instruction.rt})) break;
 
                         // write before read
-                        if (instruction.rd == currentPreIssueInstruction.rs || instruction.rd == currentPreIssueInstruction.rt){
-                            break;
-                        }
+                        if (isThereWBRHazard(currentPreIssueInstruction, instruction.rd)) break;
+
+                        // write before write
+                        if (isThereWBWHazard(currentPreIssueInstruction, instruction.rd)) break;
+                    } else {
+                        if (isThereRBWHazard(currentPreIssueInstruction, new int[]{instruction.rs})) break;
+
+                        if (isThereWBWHazard(currentPreIssueInstruction, instruction.rt)) break;
+
+                        if (isThereWBWHazard(currentPreIssueInstruction, instruction.rt)) break;
                     }
                 }
             }
 
-            if (isIType(instruction)){
-
-            }
         /*
         1. No structural hazards exist (there is room in the pre-mem/pre-ALU destination buffer)
         if (instructionsToIssue != 0) {
@@ -676,9 +685,10 @@ public class Main {
     }
 
     // I think i got everything
-    // LW and SW should be ignored
+    // SW should be ignored as it does not write to a register
     private static boolean isIType(Instruction instruction) {
-        return instruction.opcodeType == Opcode.ADDI;
+        return instruction.opcodeType == Opcode.ADDI
+                || instruction.opcodeType == Opcode.LW;
     }
 
     public static List<Instruction> getAllIssuedInstructions(){
@@ -747,14 +757,58 @@ public class Main {
         }
     }
 
-    public static boolean isThereWBRHazard(int[] argumentRegisters){
-        for (Instruction issuedInstructions : getAllIssuedInstructions()) {
+    public static boolean isThereRBWHazard(List<Instruction> instructionsToCheck, int[] argumentRegisters){
+        return isThereRBWHazard(instructionsToCheck.toArray(new Instruction[0]), argumentRegisters);
+    }
+
+    public static boolean isThereRBWHazard(Instruction[] instructionsToCheck, int[] argumentRegisters){
+        for (Instruction issuedInstructions : instructionsToCheck) {
             // true data dependency (read before write)
             for (int argumentRegister : argumentRegisters){
                 if (argumentRegister == issuedInstructions.rd){
                     return true;
                 }
             }
+        }
+
+        return false;
+    }
+
+    public static boolean isThereRBWHazard(Instruction instruction, int[] argumentRegisters){
+        return isThereRBWHazard(new Instruction[]{instruction}, argumentRegisters);
+    }
+
+    public static boolean isThereWBRHazard(Instruction[] instructionsToCheck, int writeRegister){
+        for (Instruction instructionToCheck : instructionsToCheck){
+            if (isRType(instructionToCheck) || instructionToCheck.opcodeType == Opcode.SW){
+                return writeRegister == instructionToCheck.rs || writeRegister == instructionToCheck.rt;
+            } else if (isIType(instructionToCheck)){
+                return writeRegister == instructionToCheck.rs;
+            } else {
+                /*
+                switch (instructionToCheck.opcodeType){
+                    case LW:
+                        // load word, rs is an argument register, rt is the write register
+                        return writeRegister == instructionToCheck.rs;
+                    case SW:
+                        // store word, no write register, rs and rt are argument registers
+                        return writeRegister == instructionToCheck.rs || writeRegister == instructionToCheck.rt;
+                }*/
+            }
+        }
+
+        return false;
+    }
+
+    public static boolean isThereWBRHazard(Instruction instruction, int writeRegister){
+        return isThereWBRHazard(new Instruction[]{instruction}, writeRegister);
+    }
+
+    public static boolean isThereWBWHazard(Instruction instruction, int writeRegister){
+        if (isRType(instruction)){
+            return writeRegister == instruction.rd;
+        } else if (isIType(instruction) || instruction.opcodeType == Opcode.LW){
+            return writeRegister == instruction.rt;
         }
 
         return false;
