@@ -522,12 +522,7 @@ public class Main {
             }
 
             if(isRType(instruction)){
-                for (Instruction issuedInstructions : getAllIssuedInstructions()) {
-                    // true data dependency (read before write)
-                    if (instruction.rs == issuedInstructions.rd || instruction.rt == issuedInstructions.rd){
-                        break;
-                    }
-                }
+                if (isThereWBRHazard(new int[]{instruction.rs, instruction.rt})) break;
 
                 // assuming we are not at the first buffered instructions, check all instructions before this one
                 // in the pre issue buffer
@@ -671,14 +666,19 @@ public class Main {
         }
     }
 
-    // needs to be implemented
     public static boolean isRType(Instruction instruction){
-        return true;
+        return instruction.opcodeType == Opcode.ADD
+                || instruction.opcodeType == Opcode.SUB
+                || instruction.opcodeType == Opcode.MUL
+                || instruction.opcodeType == Opcode.MOVZ
+                || instruction.opcodeType == Opcode.SLL
+                || instruction.opcodeType == Opcode.SRL;
     }
 
-    // needs to be implemented
+    // I think i got everything
+    // LW and SW should be ignored
     private static boolean isIType(Instruction instruction) {
-        return true;
+        return instruction.opcodeType == Opcode.ADDI;
     }
 
     public static List<Instruction> getAllIssuedInstructions(){
@@ -745,6 +745,19 @@ public class Main {
             default:
                 return " ERROR";
         }
+    }
+
+    public static boolean isThereWBRHazard(int[] argumentRegisters){
+        for (Instruction issuedInstructions : getAllIssuedInstructions()) {
+            // true data dependency (read before write)
+            for (int argumentRegister : argumentRegisters){
+                if (argumentRegister == issuedInstructions.rd){
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }
 
