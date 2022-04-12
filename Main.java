@@ -492,24 +492,19 @@ public class Main {
         else {
             exit;
         }
-
         2. No WBW hazards exist active instructions (issued but not finished, or
         earlier no-issued instructions)
             output dependency write before write
             Check the previous two instructions and see if their rd register matches the current instructions rd register
-
-
         3. No WBR hazards exist with earlier not-issued instructions (do not check
         for WBR hazards with instructions that have already been issued. In
         other words, you only need to check the earlier instructions in the preissue buffer and not in later buffers in the pipeline)
             Antidependency write before read
             Look at the previous 2 instructions and see if rs or rt registers match the rd register of the current instruction
-
         4. No RBW hazards (true data dependencies) exist with active instructions
         (all operands are ready)
             true data dependency read before write
             Look at the previous 2 registers and see if their rd register matches the current instructions rt or rs register
-
         5. A load instruction must wait for all previous stores to be issued
             bool isSW = false;
         6. Store instructions must be issued in order
@@ -534,6 +529,7 @@ public class Main {
 
             if (isIType(instruction)){
                 if (isThereRBWHazard(getAllIssuedInstructions(), new int[]{instruction.rs})) break;
+
             }
 
             // assuming we are not at the first buffered instructions, check all instructions before this one
@@ -542,17 +538,21 @@ public class Main {
                 Instruction[] preIssueInstructions = preIssueBuffer.toArray(new Instruction[0]);
                 for (int j = 0; j < i; j++){
                     Instruction currentPreIssueInstruction = preIssueInstructions[j];
-
+                    //check hazards for sw
+                    if(currentPreIssueInstruction.opcodeType == Opcode.SW) {
+                        isThereRBWHazard(currentPreIssueInstruction, new int[]{instruction.rs, instruction.rt});
+                        break;
+                    }
                     if (isRType(instruction)){
                         // true data dependency in pre-issue
                         if (isThereRBWHazard(currentPreIssueInstruction, new int[]{instruction.rs, instruction.rt})) break;
-
                         // write before read
                         if (isThereWBRHazard(currentPreIssueInstruction, instruction.rd)) break;
 
                         // write before write
                         if (isThereWBWHazard(currentPreIssueInstruction, instruction.rd)) break;
-                    } else {
+                    }
+                    else {
                         if (isThereRBWHazard(currentPreIssueInstruction, new int[]{instruction.rs})) break;
 
                         if (isThereWBWHazard(currentPreIssueInstruction, instruction.rt)) break;
@@ -561,26 +561,29 @@ public class Main {
                     }
                 }
             }
-
-        /*
-        1. No structural hazards exist (there is room in the pre-mem/pre-ALU destination buffer)
-        if (instructionsToIssue != 0) {
-            continue;
-        }
-        else {
-            exit;
-        }
-
-
-         */
             boolean isSW = false;
             // We need to also check for LW and SW
             // LWs cannot be issued until all SWs before it have been issue
             // SWs must be sequential
+            Instruction[] preIssueInstructions = preIssueBuffer.toArray(new Instruction[0]);
+            for(int k = 0; k < 4; k++) {
+                while(!isSW) {
+                    if (preIssueInstructions[k].opcodeType == Opcode.SW) {
+                        isSW = true;
+                        if (preMem.size() < PRE_SIZE){
+                            preMem.add(instruction);
+                            preIssueBuffer.poll();
+                            instructionsIssued++;
+                        }
+                    }
+                }
+            }
+
+            isSW = false;
             switch (instruction.opcodeType){
-                case SW:
-                    //checks whether SW happened;
-                    isSW = true;
+//                case SW:
+//                    //checks whether SW happened;
+//                    isSW = true;
                 case LW:
                     if (isSW) {
                         isSW = false;
@@ -603,6 +606,7 @@ public class Main {
             }
         }
     }
+
 
     public static void Mem() {
         if(preMem.peek() != null) {
