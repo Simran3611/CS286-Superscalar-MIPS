@@ -28,8 +28,10 @@ public class Main {
 
     public static void main(String[] args) {
         // ARGS: -i, "filename.bin", -o, "out_name"
-        String inputFile = args[1];
-        String outputFilePrefix = args[3];
+//        String inputFile = args[1];
+//        String outputFilePrefix = args[3];
+        String inputFile = "t1.bin";
+        String outputFilePrefix = "t1.pipeline";
 
         disassembly(inputFile, outputFilePrefix);
         pipeline(outputFilePrefix);
@@ -286,7 +288,9 @@ public class Main {
             printAndWrite(pipelineWriter, createDataString());
             printAndWrite(pipelineWriter, "\n");
 
-
+            if(programBreaked && (getAllIssuedInstructions().size() == 0)) {
+                endLoop = true;
+            }
             cycle++;
             i++;
 
@@ -458,15 +462,18 @@ public class Main {
         for (int i = 0; i < instructionsToFetch; i++){
             Instruction instruction = instructions.get(programCounter);
 
-            if (instruction.opcodeType == Opcode.INVALID || instruction.opcodeType == Opcode.NOP){
+            if (instruction == null){
+                programCounter = programCounter + 4;
                 continue;
-            } else if (instruction.opcodeType == Opcode.BREAK){
+            }
+            else if (instruction.opcodeType == Opcode.BREAK){
                 programBreaked = true;
                 return;
             } else if (instruction.opcodeType == Opcode.BLTZ
                     || instruction.opcodeType == Opcode.BEQ
                     || instruction.opcodeType == Opcode.J
                     || instruction.opcodeType == Opcode.JR){
+                    procStalled = true;
                 // branch logic
             }
 
@@ -564,25 +571,7 @@ public class Main {
             exit;
         }
 
-        2. No WBW hazards exist active instructions (issued but not finished, or
-        earlier no-issued instructions)
-            output dependency write before write
-            Check the previous two instructions and see if their rd register matches the current instructions rd register
 
-        3. No WBR hazards exist with earlier not-issued instructions (do not check
-        for WBR hazards with instructions that have already been issued. In
-        other words, you only need to check the earlier instructions in the preissue buffer and not in later buffers in the pipeline)
-            Antidependency write before read
-            Look at the previous 2 instructions and see if rs or rt registers match the rd register of the current instruction
-
-        4. No RBW hazards (true data dependencies) exist with active instructions
-        (all operands are ready)
-            true data dependency read before write
-            Look at the previous 2 registers and see if their rd register matches the current instructions rt or rs register
-
-        5. A load instruction must wait for all previous stores to be issued
-            bool isSW = false;
-        6. Store instructions must be issued in order
          */
             boolean isSW = false;
             // We need to also check for LW and SW
