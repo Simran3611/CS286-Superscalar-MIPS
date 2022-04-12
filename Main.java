@@ -448,9 +448,7 @@ public class Main {
         // 2. There must be room in the pre issue buffer
         // 2a. If there is only one slot in pre issue open, we can only fetch one instruction
 
-        if (procStalled){
-            return;
-        } else if (programBreaked){
+        if (programBreaked){
             return;
         }
 
@@ -462,23 +460,55 @@ public class Main {
         for (int i = 0; i < instructionsToFetch; i++){
             Instruction instruction = instructions.get(programCounter);
 
-            if (instruction == null){
+            if (instruction == null && !procStalled){
                 programCounter = programCounter + 4;
                 continue;
             }
-            else if (instruction.opcodeType == Opcode.BREAK){
+            else if (instruction.opcodeType == Opcode.BREAK && !procStalled){
                 programBreaked = true;
                 return;
-            } else if (instruction.opcodeType == Opcode.BLTZ
-                    || instruction.opcodeType == Opcode.BEQ
-                    || instruction.opcodeType == Opcode.J
-                    || instruction.opcodeType == Opcode.JR){
-                    procStalled = true;
+            } else {
+                switch(instruction.opcodeType){
+                    case J:
+                        programCounter = instruction.immd;
+                        break;
+                    case JR:
+                        if(isThereRBWHazard(getAllIssuedInstructions(), new int[]{instruction.rs}) ||
+                        isThereRBWHazard(preIssueBuffer.stream().toList(), new int[]{instruction.rs})){
+                            procStalled = true;
+                        } else {
+                            procStalled = false;
+                            programCounter = instruction.immd;
+                        }
+                        break;
+                    case BLTZ:
+                        if(isThereRBWHazard(getAllIssuedInstructions(), new int[]{instruction.rs}) ||
+                                isThereRBWHazard(preIssueBuffer.stream().toList(), new int[]{instruction.rs})){
+                            procStalled = true;
+                        } else if (registers[instruction.rs] < 0){
+                            procStalled = false;
+                            programCounter = (programCounter) + instruction.immd;
+                        } else {
+                            procStalled = false;
+                        }
+                    case BEQ:
+                        if(isThereRBWHazard(getAllIssuedInstructions(), new int[]{instruction.rs, instruction.rt}) ||
+                                isThereRBWHazard(preIssueBuffer.stream().toList(), new int[]{instruction.rs, instruction.rt})){
+                            procStalled = true;
+                        } else {
+                            if (registers[instruction.rs] == registers[instruction.rt]){
+                                procStalled = false;
+                                programCounter += instruction.immd;
+                            }
+                        }
+                }
                 // branch logic
             }
 
-            preIssueBuffer.add(instruction);
-            programCounter += 4;
+            if (!procStalled){
+                preIssueBuffer.add(instruction);
+                programCounter += 4;
+            }
         }
     }
 
