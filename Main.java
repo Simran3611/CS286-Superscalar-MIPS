@@ -30,8 +30,8 @@ public class Main {
         //ARGS: -i, "filename.bin", -o, "out_name"
         String inputFile = args[1];
         String outputFilePrefix = args[3];
-        //String inputFile = "t3.bin";
-        //String outputFilePrefix = "t3.pipeline";
+        // String inputFile = "t3.bin";
+        // String outputFilePrefix = "t3.pipeline";
 
         disassembly(inputFile, outputFilePrefix);
         pipeline(outputFilePrefix);
