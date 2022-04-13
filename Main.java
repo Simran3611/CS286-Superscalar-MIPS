@@ -25,6 +25,7 @@ public class Main {
     public static int programCounter = 96;
     public static boolean procStalled = false;
     public static boolean programBreaked = false;
+    public static boolean justJumped = false;
 
     public static void main(String[] args) {
         // ARGS: -i, "filename.bin", -o, "out_name"
@@ -294,13 +295,6 @@ public class Main {
             cycle++;
             i++;
 
-            /*
-            // we don't want to add 4 to the jump address and mess stuff up
-            if (!isJumping){
-                simMemoryAddress += 4;
-            } else {
-                isJumping = false;
-            }*/
         }
 
         try {
@@ -471,6 +465,7 @@ public class Main {
                 switch(instruction.opcodeType){
                     case J:
                         programCounter = instruction.immd;
+                        justJumped = true;
                         break;
                     case JR:
                         if(isThereRBWHazard(getAllIssuedInstructions(), new int[]{instruction.rs}) ||
@@ -479,6 +474,7 @@ public class Main {
                         } else {
                             procStalled = false;
                             programCounter = instruction.immd;
+                            justJumped = true;
                         }
                         break;
                     case BLTZ:
@@ -488,6 +484,7 @@ public class Main {
                         } else if (registers[instruction.rs] < 0){
                             procStalled = false;
                             programCounter = (programCounter) + instruction.immd;
+                            justJumped = true;
                         } else {
                             procStalled = false;
                         }
@@ -499,13 +496,16 @@ public class Main {
                             if (registers[instruction.rs] == registers[instruction.rt]){
                                 procStalled = false;
                                 programCounter += instruction.immd;
+                                justJumped = true;
+                            } else {
+                                procStalled = false;
                             }
                         }
                 }
                 // branch logic
             }
 
-            if (!procStalled){
+            if (!procStalled && !justJumped){
                 preIssueBuffer.add(instruction);
                 programCounter += 4;
             }
@@ -553,12 +553,12 @@ public class Main {
                 break;
             }
 
-            if(isRType(instruction)){
-                if (isThereRBWHazard(getAllIssuedInstructions(), new int[]{instruction.rs, instruction.rt})) break;
+            if(isRType(instruction) || instruction.opcodeType == Opcode.SW){
+                if (isThereRBWHazard(getAllIssuedInstructions(), new int[]{instruction.rs, instruction.rt})) continue;
             }
 
             if (isIType(instruction)){
-                if (isThereRBWHazard(getAllIssuedInstructions(), new int[]{instruction.rs})) break;
+                if (isThereRBWHazard(getAllIssuedInstructions(), new int[]{instruction.rs})) continue;
 
             }
 
@@ -568,58 +568,41 @@ public class Main {
                 Instruction[] preIssueInstructions = preIssueBuffer.toArray(new Instruction[0]);
                 for (int j = 0; j < i; j++){
                     Instruction currentPreIssueInstruction = preIssueInstructions[j];
-                    //check hazards for sw
-                    if(currentPreIssueInstruction.opcodeType == Opcode.SW) {
-                        isThereRBWHazard(currentPreIssueInstruction, new int[]{instruction.rs, instruction.rt});
-                        break;
-                    }
-                    if (isRType(instruction)){
+
+                    if (isRType(instruction) || instruction.opcodeType == Opcode.SW){
                         // true data dependency in pre-issue
-                        if (isThereRBWHazard(currentPreIssueInstruction, new int[]{instruction.rs, instruction.rt})) break;
+                        if (isThereRBWHazard(currentPreIssueInstruction, new int[]{instruction.rs, instruction.rt})) continue;
                         // write before read
-                        if (isThereWBRHazard(currentPreIssueInstruction, instruction.rd)) break;
+                        if (isThereWBRHazard(currentPreIssueInstruction, instruction.rd)) continue;
 
                         // write before write
-                        if (isThereWBWHazard(currentPreIssueInstruction, instruction.rd)) break;
+                        if (isThereWBWHazard(currentPreIssueInstruction, instruction.rd)) continue;
                     }
                     else {
-                        if (isThereRBWHazard(currentPreIssueInstruction, new int[]{instruction.rs})) break;
+                        if (isThereRBWHazard(currentPreIssueInstruction, new int[]{instruction.rs})) continue;
 
-                        if (isThereWBWHazard(currentPreIssueInstruction, instruction.rt)) break;
+                        if (isThereWBWHazard(currentPreIssueInstruction, instruction.rt)) continue;
 
-                        if (isThereWBWHazard(currentPreIssueInstruction, instruction.rt)) break;
+                        if (isThereWBWHazard(currentPreIssueInstruction, instruction.rt)) continue;
                     }
                 }
-            }
-            boolean isSW = false;
-            // We need to also check for LW and SW
-            // LWs cannot be issued until all SWs before it have been issue
-            // SWs must be sequential
-            Instruction[] preIssueInstructions = preIssueBuffer.toArray(new Instruction[0]);
-            for(int k = 0; k < 4; k++) {
-                while(!isSW) {
-                    if (preIssueInstructions[k].opcodeType == Opcode.SW) {
-                        isSW = true;
-                        if (preMem.size() < PRE_SIZE){
-                            preMem.add(instruction);
-                            preIssueBuffer.poll();
-                            instructionsIssued++;
+
+                if (instruction.opcodeType == Opcode.SW){
+                    for (int j = 0; j < i; j++){
+                        Instruction currentPreIssueInstruction = preIssueInstructions[j];
+
+                        // make sure our current SW instruction doesn't 'jump over' earlier SW instructions
+                        if (currentPreIssueInstruction.opcodeType == Opcode.SW){
+                            continue;
                         }
                     }
                 }
             }
 
-            isSW = false;
             switch (instruction.opcodeType){
-//                case SW:
-//                    //checks whether SW happened;
-//                    isSW = true;
+                case SW:
                 case LW:
-                    if (isSW) {
-                        isSW = false;
-                        continue;
-                    }
-                    else if (preMem.size() < PRE_SIZE){
+                    if (preMem.size() < PRE_SIZE){
                         preMem.add(instruction);
                         preIssueBuffer.poll();
                         instructionsIssued++;
@@ -637,13 +620,13 @@ public class Main {
         }
     }
 
-
     public static void Mem() {
         if(preMem.peek() != null) {
             Instruction preMemValue = preMem.poll();
             switch (preMemValue.opcodeType) {
                 case SW:
-                    // cache logic possibly
+                    int dataAddress = preMemValue.immd + registers[preMemValue.rs];
+                    data.replace(dataAddress, registers[preMemValue.rt]);
                     break;
                 case LW:
                     postMem.add(preMemValue);
@@ -693,7 +676,7 @@ public class Main {
             Instruction postMemValue = postMem.poll();
 
             if (postMemValue.opcodeType == Opcode.LW){
-                registers[postMemValue.rt] = postMemValue.immd + postMemValue.rs;
+                registers[postMemValue.rt] = data.get(postMemValue.immd + postMemValue.rs);
             }
         }
     }
@@ -785,11 +768,18 @@ public class Main {
     }
 
     public static boolean isThereRBWHazard(Instruction[] instructionsToCheck, int[] argumentRegisters){
-        for (Instruction issuedInstructions : instructionsToCheck) {
+        for (Instruction instruction : instructionsToCheck) {
             // true data dependency (read before write)
             for (int argumentRegister : argumentRegisters){
-                if (argumentRegister == issuedInstructions.rd){
-                    return true;
+
+                if (isRType(instruction)){
+                    if (argumentRegister == instruction.rd){
+                        return true;
+                    }
+                } else if (isIType(instruction)){
+                    if (argumentRegister == instruction.rt){
+                        return true;
+                    }
                 }
             }
         }
