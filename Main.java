@@ -558,7 +558,7 @@ public class Main {
                 break;
             }
 
-            if(isRType(instruction)){
+            if(isRType(instruction) || instruction.opcodeType == Opcode.SW){
                 if (isThereRBWHazard(getAllIssuedInstructions(), new int[]{instruction.rs, instruction.rt})) break;
             }
 
@@ -781,12 +781,20 @@ public class Main {
     }
 
     public static boolean isThereRBWHazard(Instruction[] instructionsToCheck, int[] argumentRegisters){
-        for (Instruction issuedInstructions : instructionsToCheck) {
+        for (Instruction issuedInstruction : instructionsToCheck) {
             // true data dependency (read before write)
             for (int argumentRegister : argumentRegisters){
-                if (argumentRegister == issuedInstructions.rd){
-                    return true;
+                // add check for i types
+                if (isRType(issuedInstruction)){
+                    if (argumentRegister == issuedInstruction.rd){
+                        return true;
+                    }
+                } else if (isIType(issuedInstruction)){
+                    if (argumentRegister == issuedInstruction.rt){
+                        return true;
+                    }
                 }
+
             }
         }
 
