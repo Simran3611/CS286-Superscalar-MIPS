@@ -288,7 +288,7 @@ public class Main {
             printAndWrite(pipelineWriter, createDataString());
             printAndWrite(pipelineWriter, "\n");
 
-            if(programBreaked && (getAllIssuedInstructions().size() == 0)) {
+            if(programBreaked && (getAllIssuedInstructions().size() == 0 && preIssueBuffer.size() == 0)) {
                 endLoop = true;
             }
             cycle++;
@@ -476,7 +476,7 @@ public class Main {
             } else {
                 switch(instruction.opcodeType){
                     case J:
-                        programCounter = instruction.immd;
+                        programCounter = instruction.j;
                         justJumped = true;
                         instructionJumpOrBranch = true;
                         break;
@@ -486,7 +486,7 @@ public class Main {
                             procStalled = true;
                         } else {
                             procStalled = false;
-                            programCounter = instruction.immd;
+                            programCounter = registers[instruction.rs];
                             justJumped = true;
                         }
                         instructionJumpOrBranch = true;
@@ -498,9 +498,10 @@ public class Main {
                         } else if (registers[instruction.rs] < 0){
                             procStalled = false;
                             programCounter = (programCounter) + instruction.immd;
-                            justJumped = true;
+                            justJumped = false;
                         } else {
                             procStalled = false;
+                            justJumped = false;
                         }
                         instructionJumpOrBranch = true;
                         break;
@@ -512,9 +513,10 @@ public class Main {
                             if (registers[instruction.rs] == registers[instruction.rt]){
                                 procStalled = false;
                                 programCounter += instruction.immd;
-                                justJumped = true;
+                                justJumped = false;
                             } else {
                                 procStalled = false;
+                                justJumped = false;
                             }
                         }
                         instructionJumpOrBranch = true;
@@ -523,11 +525,16 @@ public class Main {
                 // branch logic
             }
 
-            if (!procStalled && !justJumped){
+            if (!procStalled){
                 if (!instructionJumpOrBranch){
                     preIssueBuffer.add(instruction);
+                    programCounter += 4;
+                } else if (instructionJumpOrBranch && !justJumped) { // if the first instruction we fetch is a branch or jump but we don't branch, fetch the second instruction next cycle
+                    programCounter += 4;
+                    return;
+                } else if (instructionJumpOrBranch && justJumped){
+                    return;
                 }
-                programCounter += 4;
             }
         }
     }
