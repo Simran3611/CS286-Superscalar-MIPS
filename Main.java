@@ -453,6 +453,8 @@ public class Main {
             return;
         }
 
+        boolean instructionJumpOrBranch = false;
+
         // fetch as many instructions as we can
         // if we want to implement a cache, this must be restructured
 
@@ -473,6 +475,7 @@ public class Main {
                     case J:
                         programCounter = instruction.immd;
                         justJumped = true;
+                        instructionJumpOrBranch = true;
                         break;
                     case JR:
                         if(isThereRBWHazard(getAllIssuedInstructions(), new int[]{instruction.rs}) ||
@@ -483,6 +486,7 @@ public class Main {
                             programCounter = instruction.immd;
                             justJumped = true;
                         }
+                        instructionJumpOrBranch = true;
                         break;
                     case BLTZ:
                         if(isThereRBWHazard(getAllIssuedInstructions(), new int[]{instruction.rs}) ||
@@ -495,6 +499,8 @@ public class Main {
                         } else {
                             procStalled = false;
                         }
+                        instructionJumpOrBranch = true;
+                        break;
                     case BEQ:
                         if(isThereRBWHazard(getAllIssuedInstructions(), new int[]{instruction.rs, instruction.rt}) ||
                                 isThereRBWHazard(preIssueBuffer.stream().toList(), new int[]{instruction.rs, instruction.rt})){
@@ -508,12 +514,16 @@ public class Main {
                                 procStalled = false;
                             }
                         }
+                        instructionJumpOrBranch = true;
+                        break;
                 }
                 // branch logic
             }
 
             if (!procStalled && !justJumped){
-                preIssueBuffer.add(instruction);
+                if (!instructionJumpOrBranch){
+                    preIssueBuffer.add(instruction);
+                }
                 programCounter += 4;
             }
         }
