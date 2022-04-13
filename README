@@ -1,0 +1,9 @@
+CREATED BY:
+Nathaniel Tooley / ntooley@siue.edu
+Paris Somerville / pasomer@siue.edu
+Simran Patel / sipatel@siue.edu
+
+INSTRUCTIONS
+extract zip contents
+run make
+run java -jar mipssim.jar -i INPUTFILENAME -o OUTPUTFILESNAME
