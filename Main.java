@@ -1,5 +1,4 @@
 import java.io.*;
-import java.lang.reflect.Array;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
@@ -16,7 +15,7 @@ public class Main {
     public static ArrayList<Integer> dataAddresses = new ArrayList<>();
     public static Map<Integer, Integer> data = new HashMap<>();
     public static Map<Integer, Instruction> instructions = new HashMap<>();
-    public static Queue<Instruction> preIssueBuffer = new LinkedBlockingQueue<>(PRE_ISSUE_SIZE);
+    public static List<Instruction> preIssueBuffer = new ArrayList<>(PRE_ISSUE_SIZE);
     public static Queue<Instruction> preALU = new LinkedBlockingQueue<>(PRE_SIZE);
     public static Queue<Instruction> preMem = new LinkedBlockingQueue<>(PRE_SIZE);
     public static Queue<Instruction> postMem = new LinkedBlockingQueue<>(POST_SIZE);
@@ -31,8 +30,8 @@ public class Main {
         // ARGS: -i, "filename.bin", -o, "out_name"
 //        String inputFile = args[1];
 //        String outputFilePrefix = args[3];
-        String inputFile = "t3.bin";
-        String outputFilePrefix = "t3.pipeline";
+        String inputFile = "t4.bin";
+        String outputFilePrefix = "t4.pipeline";
 
         disassembly(inputFile, outputFilePrefix);
         pipeline(outputFilePrefix);
@@ -312,7 +311,7 @@ public class Main {
         }
     }
 
-    private static String createBufferString(Queue<Instruction> buffer, int maxSize) {
+    private static String createBufferString(List<Instruction> buffer, int maxSize) {
         String temp = "";
         Instruction[] bufferedInstructions = buffer.toArray(new Instruction[0]);
         for (int i = 0; i < maxSize; i++){
@@ -325,6 +324,10 @@ public class Main {
             temp += "\n";
         }
         return temp;
+    }
+
+    private static String createBufferString(Queue<Instruction> queue, int maxSize) {
+        return createBufferString(queue.stream().toList(), maxSize);
     }
 
     public static byte[] readBinaryFile(String filename) {
@@ -558,28 +561,31 @@ public class Main {
          */
         int instructionsIssued = 0;
 
-        for (int i = 0; i < 4; i++){
+        Instruction[] preIssueBeginning = preIssueBuffer.toArray(new Instruction[0]);
+        for (Instruction instruction : preIssueBeginning){
             if (instructionsIssued >= instructionsToIssue){
                 break;
             }
-
-            Instruction instruction = preIssueBuffer.peek();
 
             // nothing left in pre-issue
             if (instruction == null){
                 break;
             }
 
-            List<Instruction> tempList = preIssueBuffer.stream().toList();
-            int instructionIndexInPreIssue = tempList.indexOf(instruction);
+            int instructionIndexInPreIssue = preIssueBuffer.indexOf(instruction);
+
+            boolean skipInstruction = false;
 
             if(isRType(instruction) || instruction.opcodeType == Opcode.SW){
-                if (isThereRBWHazard(getAllIssuedInstructions(), new int[]{instruction.rs, instruction.rt})) continue;
+                if (isThereRBWHazard(getAllIssuedInstructions(), new int[]{instruction.rs, instruction.rt})) skipInstruction = true;
+
+                if (isThereWBWHazard(getAllIssuedInstructions(), instruction.rd)) skipInstruction = true;
             }
 
             if (isIType(instruction)){
-                if (isThereRBWHazard(getAllIssuedInstructions(), new int[]{instruction.rs})) continue;
+                if (isThereRBWHazard(getAllIssuedInstructions(), new int[]{instruction.rs})) skipInstruction = true;
 
+                if (isThereWBWHazard(getAllIssuedInstructions(), instruction.rt)) skipInstruction = true;
             }
 
             // assuming we are not at the first buffered instructions, check all instructions before this one
@@ -591,32 +597,36 @@ public class Main {
 
                     if (isRType(instruction) || instruction.opcodeType == Opcode.SW){
                         // true data dependency in pre-issue
-                        if (isThereRBWHazard(currentPreIssueInstruction, new int[]{instruction.rs, instruction.rt})) continue;
+                        if (isThereRBWHazard(currentPreIssueInstruction, new int[]{instruction.rs, instruction.rt})) skipInstruction = true;
                         // write before read
-                        if (isThereWBRHazard(currentPreIssueInstruction, instruction.rd)) continue;
+                        if (isThereWBRHazard(currentPreIssueInstruction, instruction.rd)) skipInstruction = true;
 
                         // write before write
-                        if (isThereWBWHazard(currentPreIssueInstruction, instruction.rd)) continue;
+                        if (isThereWBWHazard(currentPreIssueInstruction, instruction.rd)) skipInstruction = true;
                     }
                     else {
-                        if (isThereRBWHazard(currentPreIssueInstruction, new int[]{instruction.rs})) continue;
+                        if (isThereRBWHazard(currentPreIssueInstruction, new int[]{instruction.rs})) skipInstruction = true;
 
-                        if (isThereWBWHazard(currentPreIssueInstruction, instruction.rt)) continue;
+                        if (isThereWBRHazard(currentPreIssueInstruction, instruction.rt)) skipInstruction = true;
 
-                        if (isThereWBWHazard(currentPreIssueInstruction, instruction.rt)) continue;
+                        if (isThereWBWHazard(currentPreIssueInstruction, instruction.rt)) skipInstruction = true;
                     }
                 }
 
                 if (instruction.opcodeType == Opcode.SW){
-                    for (int j = 0; j < i; j++){
+                    for (int j = 0; j < instructionIndexInPreIssue; j++){
                         Instruction currentPreIssueInstruction = preIssueInstructions[j];
 
                         // make sure our current SW instruction doesn't 'jump over' earlier SW instructions
                         if (currentPreIssueInstruction.opcodeType == Opcode.SW){
-                            continue;
+                            skipInstruction = true;
                         }
                     }
                 }
+            }
+
+            if (skipInstruction){
+                continue;
             }
 
             switch (instruction.opcodeType){
@@ -624,14 +634,14 @@ public class Main {
                 case LW:
                     if (preMem.size() < PRE_SIZE){
                         preMem.add(instruction);
-                        preIssueBuffer.poll();
+                        preIssueBuffer.remove(instruction);
                         instructionsIssued++;
                     }
                     break;
                 default:
                     if (preALU.size() < PRE_SIZE){
                         preALU.add(instruction);
-                        preIssueBuffer.poll();
+                        preIssueBuffer.remove(instruction);
 
                         instructionsIssued++;
                     }
@@ -842,6 +852,14 @@ public class Main {
             return writeRegister == instruction.rd;
         } else if (isIType(instruction) || instruction.opcodeType == Opcode.LW){
             return writeRegister == instruction.rt;
+        }
+
+        return false;
+    }
+
+    public static boolean isThereWBWHazard(List<Instruction> instructions, int writeRegister){
+        for (Instruction instruction : instructions){
+            if (isThereWBWHazard(instruction, writeRegister)) return true;
         }
 
         return false;
