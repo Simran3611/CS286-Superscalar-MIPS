@@ -31,8 +31,8 @@ public class Main {
         // ARGS: -i, "filename.bin", -o, "out_name"
 //        String inputFile = args[1];
 //        String outputFilePrefix = args[3];
-        String inputFile = "t2.bin";
-        String outputFilePrefix = "t2.pipeline";
+        String inputFile = "t3.bin";
+        String outputFilePrefix = "t3.pipeline";
 
         disassembly(inputFile, outputFilePrefix);
         pipeline(outputFilePrefix);
@@ -696,7 +696,7 @@ public class Main {
             Instruction postMemValue = postMem.poll();
 
             if (postMemValue.opcodeType == Opcode.LW){
-                registers[postMemValue.rt] = data.get(postMemValue.immd + postMemValue.rs);
+                registers[postMemValue.rt] = data.get(postMemValue.immd + registers[postMemValue.rs]);
             }
         }
     }
