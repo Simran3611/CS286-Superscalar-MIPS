@@ -29,10 +29,10 @@ public class Main {
 
     public static void main(String[] args) {
         // ARGS: -i, "filename.bin", -o, "out_name"
-//        String inputFile = args[1];
-//        String outputFilePrefix = args[3];
-        String inputFile = "t1.bin";
-        String outputFilePrefix = "t1.pipeline";
+        String inputFile = args[1];
+        String outputFilePrefix = args[3];
+//        String inputFile = "t1.bin";
+//        String outputFilePrefix = "t1.pipeline";
 
         disassembly(inputFile, outputFilePrefix);
         pipeline(outputFilePrefix);
