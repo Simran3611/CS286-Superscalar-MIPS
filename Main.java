@@ -195,7 +195,7 @@ public class Main {
             InstructionFetch();
 
             printAndWrite(pipelineWriter, "\nPre-Issue Buffer:\n");
-            printAndWrite(pipelineWriter, createBufferString(preIssueBuffer, PRE_ISSUE_SIZE));
+            printAndWrite(pipelineWriter, createBufferString(preIssueBuffer.toArray(new Instruction[0]), PRE_ISSUE_SIZE));
             printAndWrite(pipelineWriter, "Pre_ALU Queue:\n");
             printAndWrite(pipelineWriter, createBufferString(preALU, PRE_SIZE));
             printAndWrite(pipelineWriter, "Post_ALU Queue:\n");
@@ -311,12 +311,11 @@ public class Main {
         }
     }
 
-    private static String createBufferString(List<Instruction> buffer, int maxSize) {
+    private static String createBufferString(Instruction[] buffer, int maxSize) {
         String temp = "";
-        Instruction[] bufferedInstructions = buffer.toArray(new Instruction[0]);
         for (int i = 0; i < maxSize; i++){
             try {
-                Instruction instruction = bufferedInstructions[i];
+                Instruction instruction = buffer[i];
                 temp += String.format("\tEntry %s:\t[%s]", i, createReadableMipsInstruction(instruction));
             } catch (IndexOutOfBoundsException e){
                 temp += String.format("\tEntry %s:", i);
@@ -327,7 +326,7 @@ public class Main {
     }
 
     private static String createBufferString(Queue<Instruction> queue, int maxSize) {
-        return createBufferString(queue.stream().toList(), maxSize);
+        return createBufferString(queue.toArray(new Instruction[0]), maxSize);
     }
 
     public static byte[] readBinaryFile(String filename) {
@@ -482,7 +481,7 @@ public class Main {
                         break;
                     case JR:
                         if(isThereRBWHazard(getAllIssuedInstructions(), new int[]{instruction.rs}) ||
-                        isThereRBWHazard(preIssueBuffer.stream().toList(), new int[]{instruction.rs})){
+                        isThereRBWHazard(preIssueBuffer, new int[]{instruction.rs})){
                             procStalled = true;
                         } else {
                             procStalled = false;
@@ -493,7 +492,7 @@ public class Main {
                         break;
                     case BLTZ:
                         if(isThereRBWHazard(getAllIssuedInstructions(), new int[]{instruction.rs}) ||
-                                isThereRBWHazard(preIssueBuffer.stream().toList(), new int[]{instruction.rs})){
+                                isThereRBWHazard(preIssueBuffer, new int[]{instruction.rs})){
                             procStalled = true;
                         } else if (registers[instruction.rs] < 0){
                             procStalled = false;
@@ -507,7 +506,7 @@ public class Main {
                         break;
                     case BEQ:
                         if(isThereRBWHazard(getAllIssuedInstructions(), new int[]{instruction.rs, instruction.rt}) ||
-                                isThereRBWHazard(preIssueBuffer.stream().toList(), new int[]{instruction.rs, instruction.rt})){
+                                isThereRBWHazard(preIssueBuffer, new int[]{instruction.rs, instruction.rt})){
                             procStalled = true;
                         } else {
                             if (registers[instruction.rs] == registers[instruction.rt]){
