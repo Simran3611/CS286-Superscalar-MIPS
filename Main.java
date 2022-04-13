@@ -295,6 +295,13 @@ public class Main {
             cycle++;
             i++;
 
+            /*
+            // we don't want to add 4 to the jump address and mess stuff up
+            if (!isJumping){
+                simMemoryAddress += 4;
+            } else {
+                isJumping = false;
+            }*/
         }
 
         try {
