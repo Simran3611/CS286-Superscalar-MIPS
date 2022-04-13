@@ -31,8 +31,8 @@ public class Main {
         // ARGS: -i, "filename.bin", -o, "out_name"
 //        String inputFile = args[1];
 //        String outputFilePrefix = args[3];
-        String inputFile = "t1.bin";
-        String outputFilePrefix = "t1.pipeline";
+        String inputFile = "t2.bin";
+        String outputFilePrefix = "t2.pipeline";
 
         disassembly(inputFile, outputFilePrefix);
         pipeline(outputFilePrefix);
@@ -560,6 +560,9 @@ public class Main {
                 break;
             }
 
+            List<Instruction> tempList = preIssueBuffer.stream().toList();
+            int instructionIndexInPreIssue = tempList.indexOf(instruction);
+
             if(isRType(instruction) || instruction.opcodeType == Opcode.SW){
                 if (isThereRBWHazard(getAllIssuedInstructions(), new int[]{instruction.rs, instruction.rt})) continue;
             }
@@ -571,9 +574,9 @@ public class Main {
 
             // assuming we are not at the first buffered instructions, check all instructions before this one
             // in the pre issue buffer
-            if (i != 0){
+            if (instructionIndexInPreIssue != 0){
                 Instruction[] preIssueInstructions = preIssueBuffer.toArray(new Instruction[0]);
-                for (int j = 0; j < i; j++){
+                for (int j = 0; j < instructionIndexInPreIssue; j++){
                     Instruction currentPreIssueInstruction = preIssueInstructions[j];
 
                     if (isRType(instruction) || instruction.opcodeType == Opcode.SW){
