@@ -629,6 +629,17 @@ public class Main {
                         }
                     }
                 }
+
+                if (instruction.opcodeType == Opcode.LW){
+                    for (int j = 0; j < instructionIndexInPreIssue; j++){
+                        Instruction currentPreIssueInstruction = preIssueInstructions[j];
+
+                        // make sure all previous SW have been issued
+                        if (currentPreIssueInstruction.opcodeType == Opcode.SW){
+                            skipInstruction = true;
+                        }
+                    }
+                }
             }
 
             if (skipInstruction){
